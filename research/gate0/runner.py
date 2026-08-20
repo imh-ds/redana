@@ -23,6 +23,7 @@ from research.gate0.config import (
 )
 from research.gate0.fixtures import FIXTURES, FixtureDefinition, generate_fixture
 from research.gate0.metrics import permutation_distance_correlation
+from research.gate0.report import gate_status, write_gate_report
 from research.gate0.residuals import cross_fitted_pair_residuals
 
 _MAX_PROJECTED_SECONDS = 4 * 60 * 60
@@ -59,6 +60,7 @@ class PairRecord:
     elapsed_seconds: float
     warnings: str
     exception_text: str | None
+    residual_sample_path: str | None = None
 
 
 def select_profile(smoke: SmokeMeasurement) -> ComputationalProfile | None:
@@ -103,6 +105,10 @@ def _null_statistics_filename(fixture_id: str, replication: int, role: str) -> s
     return f"{fixture_id}-replication-{replication}-{role}.npy"
 
 
+def _residual_sample_filename(fixture_id: str, replication: int, role: str) -> str:
+    return f"{fixture_id}-replication-{replication}-{role}.csv"
+
+
 def _execute_pair(
     *,
     fixture_id: str,
@@ -120,6 +126,9 @@ def _execute_pair(
     evaluation_seed = _identity_seed(fixture_id, replication, role, "evaluation")
     permutation_seed = _identity_seed(fixture_id, replication, role, "permutation")
     null_path = output_dir / "null_statistics" / _null_statistics_filename(fixture_id, replication, role)
+    residual_sample_path = (
+        output_dir / "residual_samples" / _residual_sample_filename(fixture_id, replication, role)
+    )
     started = time.perf_counter()
     caught_warnings: list[warnings.WarningMessage] = []
 
@@ -142,6 +151,8 @@ def _execute_pair(
             )
             null_path.parent.mkdir(parents=True, exist_ok=True)
             np.save(null_path, result.null_statistics)
+            residual_sample_path.parent.mkdir(parents=True, exist_ok=True)
+            evaluation.loc[:, [left, right]].to_csv(residual_sample_path, index=False)
         warning_text = "; ".join(str(item.message) for item in caught_warnings) or ""
         return PairRecord(
             fixture_id=fixture_id,
@@ -161,6 +172,7 @@ def _execute_pair(
             elapsed_seconds=time.perf_counter() - started,
             warnings=warning_text,
             exception_text=None,
+            residual_sample_path=str(residual_sample_path.relative_to(output_dir)),
         )
     except Exception as error:  # noqa: BLE001 - every pair failure must be recorded.
         return PairRecord(
@@ -181,6 +193,7 @@ def _execute_pair(
             elapsed_seconds=time.perf_counter() - started,
             warnings="; ".join(str(item.message) for item in caught_warnings) or "",
             exception_text=f"{type(error).__name__}: {error}",
+            residual_sample_path=None,
         )
 
 
@@ -266,7 +279,9 @@ def run_gate0(
     if mode == "substantive":
         profile = _load_selected_profile(output_dir)
         records = _run_pairs(mode, profile, output_dir)
-        frame, _ = _persist_records(records, output_dir)
+        initial_frame = pd.DataFrame(asdict(record) for record in records)
+        frame, _ = _persist_records(records, output_dir, gate_status(initial_frame))
+        write_gate_report(frame, output_dir)
         return frame
 
     tracemalloc.start()
