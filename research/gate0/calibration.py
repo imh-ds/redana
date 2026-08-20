@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
 import time
 import warnings
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 import numpy as np
+import pandas as pd
 
-from research.gate0.config import FULL_PROFILE, derive_seed
+from research.gate0.config import FULL_PROFILE, ComputationalProfile, Gate0Config, derive_seed
+from research.gate0.fixtures import FIXTURES, generate_fixture
 from research.gate0.metrics import permutation_distance_correlation
+from research.gate0.residuals import cross_fitted_pair_residuals
 
 CALIBRATION_FIXTURES = ("F1", "F4", "F5", "F6")
 EVALUATION_SIZES = (250, 500, 1_000, 2_000)
@@ -117,7 +123,269 @@ def run_fitted_cell(
     source_rows: int = FULL_PROFILE.source_rows,
     permutations: int = FULL_PROFILE.permutations,
 ) -> CalibrationRecord:
-    """Reserve the fitted-arm interface for the subsequent calibration task."""
+    """Run one fitted-residual calibration cell without retaining artifacts."""
 
-    del fixture_id, evaluation_rows, replication, source_rows, permutations
-    raise NotImplementedError("fitted calibration execution has not been implemented")
+    records = _run_fitted_cells(
+        fixture_id=fixture_id,
+        replication=replication,
+        config=CalibrationConfig(
+            replications=1,
+            source_rows=source_rows,
+            permutations=permutations,
+            evaluation_sizes=(evaluation_rows,),
+        ),
+        output_dir=None,
+    )
+    return records[0]
+
+
+def _fitted_seed(fixture_id: str, replication: int, purpose: str, *parts: int) -> int:
+    return derive_seed("calibration", "fitted", fixture_id, replication, purpose, *parts)
+
+
+def _sklearn_seed(identity_seed: int) -> int:
+    return identity_seed % 2**32
+
+
+def _calibration_profile(config: CalibrationConfig, evaluation_rows: int) -> ComputationalProfile:
+    return ComputationalProfile(
+        "calibration",
+        config.source_rows,
+        evaluation_rows,
+        config.replications,
+        config.permutations,
+    )
+
+
+def _fitted_record(
+    *,
+    fixture_id: str,
+    replication: int,
+    evaluation_rows: int,
+    fixture_seed: int,
+    residual_seed: int,
+    evaluation_seed: int,
+    permutation_seed: int,
+    started: float,
+    caught_warnings: list[warnings.WarningMessage],
+    result: object | None = None,
+    null_statistics_path: str | None = None,
+    residual_sample_path: str | None = None,
+    exception: Exception | None = None,
+) -> CalibrationRecord:
+    warning_text = "; ".join(str(item.message) for item in caught_warnings) or ""
+    if exception is not None:
+        return CalibrationRecord(
+            arm="fitted",
+            fixture_id=fixture_id,
+            replication=replication,
+            evaluation_rows=evaluation_rows,
+            observed_statistic=None,
+            p_value=None,
+            null_statistics_path=None,
+            residual_sample_path=None,
+            fixture_seed=fixture_seed,
+            residual_seed=residual_seed,
+            evaluation_seed=evaluation_seed,
+            left_seed=None,
+            right_seed=None,
+            permutation_seed=permutation_seed,
+            elapsed_seconds=time.perf_counter() - started,
+            warnings=warning_text,
+            exception_text=f"{type(exception).__name__}: {exception}",
+        )
+    assert result is not None
+    return CalibrationRecord(
+        arm="fitted",
+        fixture_id=fixture_id,
+        replication=replication,
+        evaluation_rows=evaluation_rows,
+        observed_statistic=result.observed,
+        p_value=result.p_value,
+        null_statistics_path=null_statistics_path,
+        residual_sample_path=residual_sample_path,
+        fixture_seed=fixture_seed,
+        residual_seed=residual_seed,
+        evaluation_seed=evaluation_seed,
+        left_seed=None,
+        right_seed=None,
+        permutation_seed=permutation_seed,
+        elapsed_seconds=time.perf_counter() - started,
+        warnings=warning_text,
+        exception_text=None,
+    )
+
+
+def _run_fitted_cells(
+    *, fixture_id: str, replication: int, config: CalibrationConfig, output_dir: Path | None
+) -> list[CalibrationRecord]:
+    fixture = FIXTURES[fixture_id]
+    left, right = fixture.target_pair
+    fixture_seed = _fitted_seed(fixture_id, replication, "fixture")
+    residual_seed = _fitted_seed(fixture_id, replication, "residual")
+    started = time.perf_counter()
+    caught_warnings: list[warnings.WarningMessage] = []
+    records: list[CalibrationRecord] = []
+
+    try:
+        with warnings.catch_warnings(record=True) as caught_warnings:
+            warnings.simplefilter("always")
+            frame = generate_fixture(fixture_id, config.source_rows, fixture_seed)
+            residuals = cross_fitted_pair_residuals(
+                frame,
+                left,
+                right,
+                Gate0Config(_calibration_profile(config, max(config.evaluation_sizes))),
+                _sklearn_seed(residual_seed),
+            )
+            for evaluation_rows in config.evaluation_sizes:
+                evaluation_seed = _fitted_seed(fixture_id, replication, "evaluation", evaluation_rows)
+                permutation_seed = _fitted_seed(
+                    fixture_id, replication, "permutation", evaluation_rows
+                )
+                try:
+                    evaluation_index = np.random.default_rng(evaluation_seed).choice(
+                        residuals.index.to_numpy(), size=evaluation_rows, replace=False
+                    )
+                    evaluation = residuals.loc[evaluation_index, [left, right]]
+                    result = permutation_distance_correlation(
+                        evaluation[left].to_numpy(),
+                        evaluation[right].to_numpy(),
+                        config.permutations,
+                        permutation_seed,
+                    )
+                    null_statistics_path = None
+                    residual_sample_path = None
+                    if output_dir is not None:
+                        artifact_dir = output_dir / "fitted"
+                        null_path = (
+                            artifact_dir
+                            / "null_statistics"
+                            / f"{fixture_id}-replication-{replication}-evaluation-{evaluation_rows}.npy"
+                        )
+                        sample_path = (
+                            artifact_dir
+                            / "residual_samples"
+                            / f"{fixture_id}-replication-{replication}-evaluation-{evaluation_rows}.csv"
+                        )
+                        null_path.parent.mkdir(parents=True, exist_ok=True)
+                        np.save(null_path, result.null_statistics)
+                        sample_path.parent.mkdir(parents=True, exist_ok=True)
+                        evaluation.to_csv(sample_path, index=False)
+                        null_statistics_path = str(null_path.relative_to(output_dir))
+                        residual_sample_path = str(sample_path.relative_to(output_dir))
+                    records.append(
+                        _fitted_record(
+                            fixture_id=fixture_id,
+                            replication=replication,
+                            evaluation_rows=evaluation_rows,
+                            fixture_seed=fixture_seed,
+                            residual_seed=residual_seed,
+                            evaluation_seed=evaluation_seed,
+                            permutation_seed=permutation_seed,
+                            started=started,
+                            caught_warnings=caught_warnings,
+                            result=result,
+                            null_statistics_path=null_statistics_path,
+                            residual_sample_path=residual_sample_path,
+                        )
+                    )
+                except Exception as error:  # noqa: BLE001 - every cell must be retained.
+                    records.append(
+                        _fitted_record(
+                            fixture_id=fixture_id,
+                            replication=replication,
+                            evaluation_rows=evaluation_rows,
+                            fixture_seed=fixture_seed,
+                            residual_seed=residual_seed,
+                            evaluation_seed=evaluation_seed,
+                            permutation_seed=permutation_seed,
+                            started=started,
+                            caught_warnings=caught_warnings,
+                            exception=error,
+                        )
+                    )
+    except Exception as error:  # noqa: BLE001 - failed fitted setup must retain every cell.
+        for evaluation_rows in config.evaluation_sizes:
+            records.append(
+                _fitted_record(
+                    fixture_id=fixture_id,
+                    replication=replication,
+                    evaluation_rows=evaluation_rows,
+                    fixture_seed=fixture_seed,
+                    residual_seed=residual_seed,
+                    evaluation_seed=_fitted_seed(
+                        fixture_id, replication, "evaluation", evaluation_rows
+                    ),
+                    permutation_seed=_fitted_seed(
+                        fixture_id, replication, "permutation", evaluation_rows
+                    ),
+                    started=started,
+                    caught_warnings=caught_warnings,
+                    exception=error,
+                )
+            )
+    return records
+
+
+def _source_revision() -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=Path(__file__).resolve().parents[2],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else "unavailable"
+
+
+def _write_json(path: Path, payload: object) -> None:
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _initialize_run(output_dir: Path) -> None:
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise FileExistsError(f"run directory is already initialized: {output_dir}")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+
+def run_calibration(output_dir: Path, run_id: str, config: CalibrationConfig) -> pd.DataFrame:
+    """Run and persist the frozen fitted-residual and reference calibration arms."""
+
+    if not run_id or not run_id.strip():
+        raise ValueError("run_id must be non-empty")
+    _initialize_run(output_dir)
+
+    records: list[CalibrationRecord] = []
+    for replication in range(config.replications):
+        for fixture_id in CALIBRATION_FIXTURES:
+            records.extend(
+                _run_fitted_cells(
+                    fixture_id=fixture_id,
+                    replication=replication,
+                    config=config,
+                    output_dir=output_dir,
+                )
+            )
+        for evaluation_rows in config.evaluation_sizes:
+            records.append(
+                run_reference_cell(
+                    evaluation_rows=evaluation_rows,
+                    replication=replication,
+                    permutations=config.permutations,
+                )
+            )
+
+    frame = pd.DataFrame(asdict(record) for record in records)
+    frame.insert(0, "run_id", run_id)
+    frame.to_csv(output_dir / "records.csv", index=False)
+    _write_json(
+        output_dir / "manifest.json",
+        {
+            "config": asdict(config),
+            "run_id": run_id,
+            "source_revision": _source_revision(),
+        },
+    )
+    _write_json(output_dir / "run_state.json", {"run_id": run_id, "state": "complete"})
+    return frame
