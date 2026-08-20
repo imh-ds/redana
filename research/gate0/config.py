@@ -1,7 +1,7 @@
 """Frozen computational settings for the disposable Gate 0 research run."""
 
-from dataclasses import dataclass
 import hashlib
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -36,4 +36,3 @@ def derive_seed(*parts: str | int) -> int:
 
     identity = "|".join(str(part) for part in parts).encode("utf-8")
     return int.from_bytes(hashlib.sha256(identity).digest()[:8], byteorder="big", signed=False)
-
