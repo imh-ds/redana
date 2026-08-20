@@ -1,0 +1,15 @@
+{
+  "config": {
+    "evaluation_sizes": [
+      250,
+      500,
+      1000,
+      2000
+    ],
+    "permutations": 199,
+    "replications": 30,
+    "source_rows": 50000
+  },
+  "run_id": "null-calibration-20260820-001",
+  "source_revision": "446be3b014dfa87bfc0bf5d6f6fa1c39da552999"
+}
