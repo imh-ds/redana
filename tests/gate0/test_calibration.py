@@ -37,6 +37,18 @@ def test_fitted_arm_records_only_the_four_approved_null_fixtures(tmp_path: Path)
     assert set(frame.loc[frame.arm == "reference", "fixture_id"]) == {"reference"}
 
 
+def test_calibration_records_name_the_empirical_permutation_p_value(tmp_path: Path) -> None:
+    """The report consumes the explicit permutation p-value record field."""
+
+    frame = run_calibration(
+        tmp_path,
+        "p-value-field",
+        CalibrationConfig(replications=1, source_rows=300, evaluation_sizes=(250,), permutations=19),
+    )
+
+    assert "permutation_p_value" in frame
+
+
 def test_calibration_retains_a_fitted_arm_exception(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(
         "research.gate0.calibration.generate_fixture",

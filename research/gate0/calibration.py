@@ -40,7 +40,7 @@ class CalibrationRecord:
     replication: int
     evaluation_rows: int
     observed_statistic: float | None
-    p_value: float | None
+    permutation_p_value: float | None
     null_statistics_path: str | None
     residual_sample_path: str | None
     fixture_seed: int | None
@@ -85,7 +85,7 @@ def run_reference_cell(
             replication=replication,
             evaluation_rows=evaluation_rows,
             observed_statistic=result.observed,
-            p_value=result.p_value,
+            permutation_p_value=result.p_value,
             null_statistics_path=null_statistics_path,
             residual_sample_path=None,
             fixture_seed=None,
@@ -105,7 +105,7 @@ def run_reference_cell(
             replication=replication,
             evaluation_rows=evaluation_rows,
             observed_statistic=None,
-            p_value=None,
+            permutation_p_value=None,
             null_statistics_path=null_statistics_path,
             residual_sample_path=None,
             fixture_seed=None,
@@ -220,7 +220,7 @@ def _fitted_record(
             replication=replication,
             evaluation_rows=evaluation_rows,
             observed_statistic=None,
-            p_value=None,
+            permutation_p_value=None,
             null_statistics_path=null_statistics_path,
             residual_sample_path=residual_sample_path,
             fixture_seed=fixture_seed,
@@ -240,7 +240,7 @@ def _fitted_record(
         replication=replication,
         evaluation_rows=evaluation_rows,
         observed_statistic=result.observed,
-        p_value=result.p_value,
+        permutation_p_value=result.p_value,
         null_statistics_path=null_statistics_path,
         residual_sample_path=residual_sample_path,
         fixture_seed=fixture_seed,
