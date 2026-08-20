@@ -1,0 +1,17 @@
+{
+  "elapsed_seconds": 0.5931347999994614,
+  "peak_gib": 0.003242344595491886,
+  "profile_projections": {
+    "full": {
+      "projected_peak_gib": 0.03242344595491886,
+      "projected_seconds": 813.1727288291461
+    },
+    "reduced": {
+      "projected_peak_gib": 0.012969378381967545,
+      "projected_seconds": 307.7973080005904
+    }
+  },
+  "projected_seconds": 813.1727288291461,
+  "python_allocation_peak_bytes": 3481441,
+  "run_id": "gate0-20260820-001"
+}

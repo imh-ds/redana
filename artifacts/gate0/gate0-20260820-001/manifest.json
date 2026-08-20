@@ -1,0 +1,326 @@
+{
+  "frozen_protocol": {
+    "adjustment_model": {
+      "cross_fitting": true,
+      "estimator": "Ridge",
+      "n_splits": 5,
+      "ridge_alpha": 1.0,
+      "scaler": "StandardScaler",
+      "spline_degree": 3,
+      "spline_include_bias": false,
+      "spline_knot_strategy": "quantile",
+      "spline_knots": 5
+    },
+    "classification_thresholds": {
+      "ambiguous": "Any other result.",
+      "non-null": "At least 8 of 10 p-values <= 0.01 and median observed distance correlation >= 0.10.",
+      "null-like": "At most 2 of 10 p-values <= 0.05 and median observed distance correlation < 0.05."
+    },
+    "dependencies": {
+      "dcor": "0.7",
+      "matplotlib": "3.11.1",
+      "numpy": "2.5.2",
+      "pandas": "3.0.5",
+      "python": "3.12.13",
+      "scikit-learn": "1.9.0"
+    },
+    "fixture_evaluations": {
+      "F1": {
+        "expected_null_control_class": "null-like",
+        "expected_target_class": "null-like",
+        "null_control_pair": [
+          "X4",
+          "X5"
+        ],
+        "target_pair": [
+          "X1",
+          "X2"
+        ]
+      },
+      "F2": {
+        "expected_null_control_class": "null-like",
+        "expected_target_class": "non-null",
+        "null_control_pair": [
+          "X4",
+          "X5"
+        ],
+        "target_pair": [
+          "X1",
+          "X2"
+        ]
+      },
+      "F3": {
+        "expected_null_control_class": "null-like",
+        "expected_target_class": "non-null",
+        "null_control_pair": [
+          "X4",
+          "X5"
+        ],
+        "target_pair": [
+          "X1",
+          "X2"
+        ]
+      },
+      "F4": {
+        "expected_null_control_class": "null-like",
+        "expected_target_class": "null-like",
+        "null_control_pair": [
+          "X4",
+          "X5"
+        ],
+        "target_pair": [
+          "X1",
+          "X3"
+        ]
+      },
+      "F5": {
+        "expected_null_control_class": "null-like",
+        "expected_target_class": "null-like",
+        "null_control_pair": [
+          "X4",
+          "X5"
+        ],
+        "target_pair": [
+          "X1",
+          "X2"
+        ]
+      },
+      "F6": {
+        "expected_null_control_class": "null-like",
+        "expected_target_class": "null-like",
+        "null_control_pair": [
+          "X4",
+          "X5"
+        ],
+        "target_pair": [
+          "X1",
+          "X3"
+        ]
+      },
+      "F7": {
+        "expected_null_control_class": "null-like",
+        "expected_target_class": "non-null",
+        "null_control_pair": [
+          "X4",
+          "X5"
+        ],
+        "target_pair": [
+          "X1",
+          "X2"
+        ]
+      },
+      "F8": {
+        "expected_null_control_class": "null-like",
+        "expected_target_class": "non-null",
+        "null_control_pair": [
+          "X4",
+          "X5"
+        ],
+        "target_pair": [
+          "X1",
+          "X2"
+        ]
+      }
+    },
+    "fixture_gate_thresholds": {
+      "NARROW": "Any remaining ambiguity.",
+      "PASS": "Every target matches its expected class and every null-control pair is null-like.",
+      "STOP": "Any expected target-class mismatch (including the F7 collider target), any non-null control, any exception, or any malformed or incomplete matrix."
+    },
+    "fixture_generation": {
+      "coefficient": 0.7,
+      "equations": {
+        "F1": "X1=e1; X2=e2; X3=e3; X4=e4; X5=e5; X6=e6",
+        "F2": "X1=e1; X2=0.7*X1+e2; X3=e3; X4=e4; X5=e5; X6=e6",
+        "F3": "X1=e1; X2=0.7*(X1**2-1)+e2; X3=e3; X4=e4; X5=e5; X6=e6",
+        "F4": "X1=e1; X2=0.7*X1+e2; X3=0.7*X2+e3; X4=e4; X5=e5; X6=e6",
+        "F5": "X3=e3; X1=0.7*(X3**2-1)+e1; X2=0.7*(X3**2-1)+e2; X4=e4; X5=e5; X6=e6",
+        "F6": "X1=e1; X2=0.7*(X1**2-1)+e2; X3=0.7*X2+e3; X4=e4; X5=e5; X6=e6",
+        "F7": "X1=e1; X2=e2; X3=0.7*X1+0.7*X2+e3; X4=e4; X5=e5; X6=e6",
+        "F8": "X1=e1; X3=0.7*X1+e3; X2=0.7*X1+0.7*X3+e2; X4=e4; X5=e5; X6=e6"
+      },
+      "linear_relationship": "0.7x",
+      "noise_distribution": "independent standard Gaussian",
+      "noise_mean": 0.0,
+      "noise_standard_deviation": 1.0,
+      "post_generation_standardization": "Each X1-X6 column is centered by its generated sample mean and scaled by its generated population standard deviation (ddof=0).",
+      "quadratic_centered": true,
+      "quadratic_relationship": "0.7(x^2 - 1)"
+    },
+    "permutation_p_value": "(1 + count(null >= observed)) / (B + 1)",
+    "procedure": {
+      "adjustment_set": "all observed variables except both pair endpoints",
+      "data_type": "continuous simulated data",
+      "dependence_statistic": "distance correlation",
+      "fixture_ids": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8"
+      ],
+      "observed_variables": 6,
+      "permutation_reference": "permute one residual vector",
+      "residuals": "pair-specific out-of-sample predictions"
+    },
+    "profile": {
+      "evaluation_rows": 1000,
+      "name": "full",
+      "permutations": 199,
+      "replications": 10,
+      "source_rows": 50000
+    },
+    "seed_derivation": {
+      "algorithm": "SHA-256",
+      "execution_order_independent": true,
+      "identity_rule": "SHA-256 of UTF-8 text formed by joining identity parts with '|'; the first eight digest bytes are interpreted as an unsigned big-endian integer.",
+      "pair_role_evaluation": {
+        "identity_parts": [
+          "gate0",
+          "fixture_id",
+          "replication",
+          "pair_role",
+          "evaluation"
+        ],
+        "purpose": "pair-role-evaluation"
+      },
+      "pair_role_permutation": {
+        "identity_parts": [
+          "gate0",
+          "fixture_id",
+          "replication",
+          "pair_role",
+          "permutation"
+        ],
+        "permutation_child": [
+          "permutation",
+          "permutation_seed",
+          "permutation_index"
+        ],
+        "purpose": "pair-role-permutation"
+      },
+      "pair_role_residual": {
+        "identity_parts": [
+          "gate0",
+          "fixture_id",
+          "replication",
+          "pair_role",
+          "residual"
+        ],
+        "purpose": "pair-role-residual",
+        "scikit_learn_seed": "identity seed modulo 2**32 for KFold random_state"
+      },
+      "shared_fixture_dataset": {
+        "identity_parts": [
+          "gate0",
+          "fixture_id",
+          "replication",
+          "fixture",
+          "dataset"
+        ],
+        "nested_rehashing": [
+          "fixture",
+          "fixture_id",
+          "seed"
+        ],
+        "pair_identity_included": false,
+        "purpose": "fixture-dataset"
+      }
+    },
+    "source_revision": "126cf73fe8467e2c9041b6603037b0154627b743"
+  },
+  "gate_status": "NARROW",
+  "memo": "gate-memo.md",
+  "plots": [
+    "plots\\F1-permutation-distribution.png",
+    "plots\\F1-residual-scatter.png",
+    "plots\\F2-permutation-distribution.png",
+    "plots\\F2-residual-scatter.png",
+    "plots\\F3-permutation-distribution.png",
+    "plots\\F3-residual-scatter.png",
+    "plots\\F4-permutation-distribution.png",
+    "plots\\F4-residual-scatter.png",
+    "plots\\F5-permutation-distribution.png",
+    "plots\\F5-residual-scatter.png",
+    "plots\\F6-permutation-distribution.png",
+    "plots\\F6-residual-scatter.png",
+    "plots\\F7-permutation-distribution.png",
+    "plots\\F7-residual-scatter.png",
+    "plots\\F8-permutation-distribution.png",
+    "plots\\F8-residual-scatter.png"
+  ],
+  "profiles": [
+    "full"
+  ],
+  "records": "records.csv",
+  "representatives": [
+    {
+      "fixture_id": "F1",
+      "null_statistics_path": "substantive\\null_statistics\\F1-replication-0-target.npy",
+      "observed_statistic": 0.04334053613927789,
+      "pair_role": "target",
+      "replication": 0,
+      "residual_sample_path": "substantive\\residual_samples\\F1-replication-0-target.csv"
+    },
+    {
+      "fixture_id": "F2",
+      "null_statistics_path": "substantive\\null_statistics\\F2-replication-0-target.npy",
+      "observed_statistic": 0.5030978157378532,
+      "pair_role": "target",
+      "replication": 0,
+      "residual_sample_path": "substantive\\residual_samples\\F2-replication-0-target.csv"
+    },
+    {
+      "fixture_id": "F3",
+      "null_statistics_path": "substantive\\null_statistics\\F3-replication-0-target.npy",
+      "observed_statistic": 0.3396193530187431,
+      "pair_role": "target",
+      "replication": 0,
+      "residual_sample_path": "substantive\\residual_samples\\F3-replication-0-target.csv"
+    },
+    {
+      "fixture_id": "F4",
+      "null_statistics_path": "substantive\\null_statistics\\F4-replication-0-target.npy",
+      "observed_statistic": 0.05616784677536931,
+      "pair_role": "target",
+      "replication": 0,
+      "residual_sample_path": "substantive\\residual_samples\\F4-replication-0-target.csv"
+    },
+    {
+      "fixture_id": "F5",
+      "null_statistics_path": "substantive\\null_statistics\\F5-replication-0-target.npy",
+      "observed_statistic": 0.08423076347468791,
+      "pair_role": "target",
+      "replication": 0,
+      "residual_sample_path": "substantive\\residual_samples\\F5-replication-0-target.csv"
+    },
+    {
+      "fixture_id": "F6",
+      "null_statistics_path": "substantive\\null_statistics\\F6-replication-0-target.npy",
+      "observed_statistic": 0.05409207550439968,
+      "pair_role": "target",
+      "replication": 0,
+      "residual_sample_path": "substantive\\residual_samples\\F6-replication-0-target.csv"
+    },
+    {
+      "fixture_id": "F7",
+      "null_statistics_path": "substantive\\null_statistics\\F7-replication-0-target.npy",
+      "observed_statistic": 0.31249256565569267,
+      "pair_role": "target",
+      "replication": 0,
+      "residual_sample_path": "substantive\\residual_samples\\F7-replication-0-target.csv"
+    },
+    {
+      "fixture_id": "F8",
+      "null_statistics_path": "substantive\\null_statistics\\F8-replication-0-target.npy",
+      "observed_statistic": 0.46247844124192866,
+      "pair_role": "target",
+      "replication": 0,
+      "residual_sample_path": "substantive\\residual_samples\\F8-replication-0-target.csv"
+    }
+  ],
+  "run_id": "gate0-20260820-001"
+}

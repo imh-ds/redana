@@ -1,0 +1,8 @@
+{
+  "evaluation_rows": 1000,
+  "name": "full",
+  "permutations": 199,
+  "replications": 10,
+  "run_id": "gate0-20260820-001",
+  "source_rows": 50000
+}
