@@ -68,7 +68,12 @@ def select_profile(smoke: SmokeMeasurement) -> ComputationalProfile | None:
         return None
     if smoke.projected_seconds <= _MAX_PROJECTED_SECONDS:
         return FULL_PROFILE
-    return REDUCED_PROFILE
+    reduced_projected_seconds = smoke.projected_seconds * (
+        _profile_work(REDUCED_PROFILE) / _profile_work(FULL_PROFILE)
+    )
+    if reduced_projected_seconds <= _MAX_PROJECTED_SECONDS:
+        return REDUCED_PROFILE
+    return None
 
 
 def _pairs_for_fixture(fixture: FixtureDefinition) -> tuple[tuple[str, tuple[str, str], str], ...]:
@@ -104,12 +109,13 @@ def _execute_pair(
     output_dir: Path,
 ) -> PairRecord:
     left, right = pair
-    fixture_seed = _identity_seed(fixture_id, replication, role, "fixture")
+    fixture_seed = _identity_seed(fixture_id, replication, "fixture", "dataset")
     residual_seed = _identity_seed(fixture_id, replication, role, "residual")
     evaluation_seed = _identity_seed(fixture_id, replication, role, "evaluation")
     permutation_seed = _identity_seed(fixture_id, replication, role, "permutation")
     null_path = output_dir / "null_statistics" / _null_statistics_filename(fixture_id, replication, role)
     started = time.perf_counter()
+    caught_warnings: list[warnings.WarningMessage] = []
 
     try:
         with warnings.catch_warnings(record=True) as caught_warnings:
@@ -130,7 +136,7 @@ def _execute_pair(
             )
             null_path.parent.mkdir(parents=True, exist_ok=True)
             np.save(null_path, result.null_statistics)
-            warning_text = "; ".join(str(item.message) for item in caught_warnings) or ""
+        warning_text = "; ".join(str(item.message) for item in caught_warnings) or ""
         return PairRecord(
             fixture_id=fixture_id,
             replication=replication,
@@ -167,7 +173,7 @@ def _execute_pair(
             permutation_seed=permutation_seed,
             profile=profile.name,
             elapsed_seconds=time.perf_counter() - started,
-            warnings="",
+            warnings="; ".join(str(item.message) for item in caught_warnings) or "",
             exception_text=f"{type(error).__name__}: {error}",
         )
 
@@ -225,9 +231,13 @@ def _load_selected_profile(output_dir: Path) -> ComputationalProfile:
         raise ValueError("selected_profile.json does not name an approved profile") from error
 
 
-def _persist_records(records: list[PairRecord], output_dir: Path) -> tuple[pd.DataFrame, str]:
+def _persist_records(
+    records: list[PairRecord], output_dir: Path, gate_result: str | None = None
+) -> tuple[pd.DataFrame, str]:
     frame = pd.DataFrame(asdict(record) for record in records)
-    gate_result = "STOP" if any(record.exception_text for record in records) else "READY"
+    gate_result = gate_result or (
+        "STOP" if any(record.exception_text for record in records) else "READY"
+    )
     frame["gate_result"] = gate_result
     frame.to_csv(output_dir / "pair_records.csv", index=False)
     _write_json(
@@ -245,6 +255,8 @@ def run_gate0(
     if mode not in {"smoke", "substantive"}:
         raise ValueError("mode must be 'smoke' or 'substantive'")
     output_dir.mkdir(parents=True, exist_ok=True)
+    if mode == "smoke":
+        (output_dir / "selected_profile.json").unlink(missing_ok=True)
     if mode == "substantive":
         profile = _load_selected_profile(output_dir)
         records = _run_pairs(mode, profile, output_dir)
@@ -261,7 +273,6 @@ def run_gate0(
     finally:
         tracemalloc.stop()
 
-    frame, gate_result = _persist_records(records, output_dir)
     smoke = SmokeMeasurement(
         projected_seconds=_estimate_full_seconds(records),
         peak_gib=peak_bytes / 1024**3,
@@ -275,7 +286,12 @@ def run_gate0(
             "peak_gib": smoke.peak_gib,
         },
     )
-    selected_profile = select_profile(smoke) if gate_result != "STOP" else None
+    selected_profile = (
+        select_profile(smoke) if not any(record.exception_text for record in records) else None
+    )
+    frame, _ = _persist_records(
+        records, output_dir, "READY" if selected_profile is not None else "STOP"
+    )
     if selected_profile is not None:
         _write_json(output_dir / "selected_profile.json", asdict(selected_profile))
     return frame
