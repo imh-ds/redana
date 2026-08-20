@@ -87,6 +87,15 @@ def test_gate_status_stops_for_a_record_that_contradicts_the_fixture_registry() 
     assert gate_status(records) == "STOP"
 
 
+def test_gate_status_stops_when_collider_target_is_null_like() -> None:
+    records = _complete_frozen_records()
+    f7_target = (records["fixture_id"] == "F7") & (records["pair_role"] == "target")
+    records.loc[f7_target, "observed_statistic"] = 0.02
+    records.loc[f7_target, "permutation_p_value"] = 0.5
+
+    assert gate_status(records) == "STOP"
+
+
 def test_report_writes_evidence_and_stops_for_unexpected_null_like(tmp_path) -> None:
     null_path = tmp_path / "null_statistics" / "f7-target.npy"
     null_path.parent.mkdir()
@@ -320,8 +329,28 @@ def test_manifest_and_memo_preserve_the_complete_frozen_protocol(tmp_path) -> No
     )
     assert protocol["seed_derivation"] == {
         "algorithm": "SHA-256",
-        "identity_rule": "Join fixture, replication, pair, and permutation identities with '|' as UTF-8; use the first eight digest bytes as an unsigned big-endian integer.",
+        "identity_rule": "SHA-256 of UTF-8 text formed by joining identity parts with '|'; the first eight digest bytes are interpreted as an unsigned big-endian integer.",
         "execution_order_independent": True,
+        "shared_fixture_dataset": {
+            "purpose": "fixture-dataset",
+            "identity_parts": ["gate0", "fixture_id", "replication", "fixture", "dataset"],
+            "pair_identity_included": False,
+            "nested_rehashing": ["fixture", "fixture_id", "seed"],
+        },
+        "pair_role_residual": {
+            "purpose": "pair-role-residual",
+            "identity_parts": ["gate0", "fixture_id", "replication", "pair_role", "residual"],
+            "scikit_learn_seed": "identity seed modulo 2**32 for KFold random_state",
+        },
+        "pair_role_evaluation": {
+            "purpose": "pair-role-evaluation",
+            "identity_parts": ["gate0", "fixture_id", "replication", "pair_role", "evaluation"],
+        },
+        "pair_role_permutation": {
+            "purpose": "pair-role-permutation",
+            "identity_parts": ["gate0", "fixture_id", "replication", "pair_role", "permutation"],
+            "permutation_child": ["permutation", "permutation_seed", "permutation_index"],
+        },
     }
     assert protocol["permutation_p_value"] == "(1 + count(null >= observed)) / (B + 1)"
     assert protocol["classification_thresholds"] == {
@@ -331,7 +360,7 @@ def test_manifest_and_memo_preserve_the_complete_frozen_protocol(tmp_path) -> No
     }
     assert protocol["fixture_gate_thresholds"] == {
         "PASS": "Every target matches its expected class and every null-control pair is null-like.",
-        "STOP": "Any unexpected non-null target/control result or expected direct-dependence target that is null-like.",
+        "STOP": "Any expected target-class mismatch (including the F7 collider target), any non-null control, any exception, or any malformed or incomplete matrix.",
         "NARROW": "Any remaining ambiguity.",
     }
 
@@ -339,6 +368,10 @@ def test_manifest_and_memo_preserve_the_complete_frozen_protocol(tmp_path) -> No
     assert "## Exact fixture equations and evaluation pairs" in memo
     assert "| F8 | X1=e1; X3=0.7*X1+e3; X2=0.7*X1+0.7*X3+e2; X4=e4; X5=e5; X6=e6 | X1, X2 | X4, X5 | non-null | null-like |" in memo
     assert "Post-generation standardization: Each X1-X6 column is centered" in memo
-    assert "Seed derivation: Join fixture, replication, pair, and permutation identities" in memo
+    assert "Seed derivation: SHA-256 of UTF-8 text formed by joining identity parts with '|'; the first eight digest bytes are interpreted as an unsigned big-endian integer." in memo
+    assert "Shared fixture dataset (`fixture-dataset`): `gate0 | fixture_id | replication | fixture | dataset`; pair identity is not included; fixture generation rehashes `fixture | fixture_id | seed`." in memo
+    assert "Pair-role residual (`pair-role-residual`): `gate0 | fixture_id | replication | pair_role | residual`; KFold receives the identity seed modulo `2**32`." in memo
+    assert "Pair-role evaluation (`pair-role-evaluation`): `gate0 | fixture_id | replication | pair_role | evaluation`." in memo
+    assert "Pair-role permutation (`pair-role-permutation`): `gate0 | fixture_id | replication | pair_role | permutation`; each permutation child rehashes `permutation | permutation_seed | permutation_index`." in memo
     assert "Empirical permutation p-value: `(1 + count(null >= observed)) / (B + 1)`" in memo
     assert "## Pair and fixture gate thresholds" in memo

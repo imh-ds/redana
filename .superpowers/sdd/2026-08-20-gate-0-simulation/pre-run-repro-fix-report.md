@@ -22,3 +22,16 @@ With no `--run-id`, smoke still creates a UTC identity. A following substantive 
 - Focused green: `14 passed` across the CLI and report test modules using `.venv`.
 - Full suite: `30 passed` using `.venv`.
 - Ruff: `.venv\\Scripts\\python.exe -m ruff check research tests scripts` completed with `All checks passed!`.
+
+## Review round 2: reproducibility and gate-semantics correction
+
+The frozen protocol in both `manifest.json` and `gate-memo.md` now specifies the exact identity-based seed schedule: SHA-256 of a UTF-8 pipe join, first eight digest bytes interpreted as an unsigned big-endian integer, and independence from execution order. It distinguishes the shared fixture-dataset seed (without pair identity), pair-role residual/evaluation/permutation seeds, the fixture generator's nested rehash, permutation-child rehashing, and the 32-bit projection supplied to scikit-learn `KFold`.
+
+The published gate language now matches runtime behavior: STOP covers every expected target-class mismatch (including F7's collider target), every non-null control, exceptions, and malformed or incomplete matrices; NARROW is reserved for remaining ambiguity; PASS requires the exact expected matrix.
+
+Verification for this correction:
+
+- TDD red: `tests\\gate0\\test_report.py` failed on the missing complete seed schedule in the frozen protocol.
+- Focused green: `11 passed` via `.venv\\Scripts\\python.exe -m pytest tests\\gate0\\test_report.py -q`.
+- Full suite: `31 passed` via `.venv\\Scripts\\python.exe -m pytest -q`.
+- Ruff: `.venv\\Scripts\\python.exe -m ruff check research tests scripts` completed with `All checks passed!`.

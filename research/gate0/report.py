@@ -335,10 +335,30 @@ def _frozen_protocol(profile: ComputationalProfile) -> dict[str, Any]:
         "seed_derivation": {
             "algorithm": "SHA-256",
             "identity_rule": (
-                "Join fixture, replication, pair, and permutation identities with '|' as UTF-8; "
-                "use the first eight digest bytes as an unsigned big-endian integer."
+                "SHA-256 of UTF-8 text formed by joining identity parts with '|'; the first "
+                "eight digest bytes are interpreted as an unsigned big-endian integer."
             ),
             "execution_order_independent": True,
+            "shared_fixture_dataset": {
+                "purpose": "fixture-dataset",
+                "identity_parts": ["gate0", "fixture_id", "replication", "fixture", "dataset"],
+                "pair_identity_included": False,
+                "nested_rehashing": ["fixture", "fixture_id", "seed"],
+            },
+            "pair_role_residual": {
+                "purpose": "pair-role-residual",
+                "identity_parts": ["gate0", "fixture_id", "replication", "pair_role", "residual"],
+                "scikit_learn_seed": "identity seed modulo 2**32 for KFold random_state",
+            },
+            "pair_role_evaluation": {
+                "purpose": "pair-role-evaluation",
+                "identity_parts": ["gate0", "fixture_id", "replication", "pair_role", "evaluation"],
+            },
+            "pair_role_permutation": {
+                "purpose": "pair-role-permutation",
+                "identity_parts": ["gate0", "fixture_id", "replication", "pair_role", "permutation"],
+                "permutation_child": ["permutation", "permutation_seed", "permutation_index"],
+            },
         },
         "permutation_p_value": "(1 + count(null >= observed)) / (B + 1)",
         "classification_thresholds": {
@@ -355,8 +375,8 @@ def _frozen_protocol(profile: ComputationalProfile) -> dict[str, Any]:
                 "Every target matches its expected class and every null-control pair is null-like."
             ),
             "STOP": (
-                "Any unexpected non-null target/control result or expected direct-dependence "
-                "target that is null-like."
+                "Any expected target-class mismatch (including the F7 collider target), any "
+                "non-null control, any exception, or any malformed or incomplete matrix."
             ),
             "NARROW": "Any remaining ambiguity.",
         },
@@ -434,6 +454,25 @@ def _protocol_memo_lines(protocol: dict[str, Any]) -> list[str]:
             f"Post-generation standardization: {fixture['post_generation_standardization']}",
             "",
             f"Seed derivation: {seed['identity_rule']}",
+            "Seed derivation is identity-based and independent of execution order.",
+            (
+                "Shared fixture dataset (`fixture-dataset`): `gate0 | fixture_id | replication "
+                "| fixture | dataset`; pair identity is not included; fixture generation rehashes "
+                "`fixture | fixture_id | seed`."
+            ),
+            (
+                "Pair-role residual (`pair-role-residual`): `gate0 | fixture_id | replication | "
+                "pair_role | residual`; KFold receives the identity seed modulo `2**32`."
+            ),
+            (
+                "Pair-role evaluation (`pair-role-evaluation`): `gate0 | fixture_id | replication "
+                "| pair_role | evaluation`."
+            ),
+            (
+                "Pair-role permutation (`pair-role-permutation`): `gate0 | fixture_id | replication "
+                "| pair_role | permutation`; each permutation child rehashes `permutation | "
+                "permutation_seed | permutation_index`."
+            ),
             "",
             f"Empirical permutation p-value: `{protocol['permutation_p_value']}`",
             "",
