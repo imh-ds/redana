@@ -1,0 +1,24 @@
+{
+  "original_records_path": "../../../artifacts/null-calibration/null-calibration-20260820-001/records.csv",
+  "original_records_sha256": "57160bf69892c4047e8a089487d5b894d09243c1a3bcf60164f4daa881369197",
+  "original_run_manifest_path": "../../../artifacts/null-calibration/null-calibration-20260820-001/manifest.json",
+  "original_run_manifest_sha256": "4c370ac8666df9dbcbeb384dd2a27efecf4652c1373793f8ded5f94c1738d6cd",
+  "record_count": 600,
+  "schedule": "calibration-v1",
+  "schedule_source": {
+    "fitted": "derive_seed('calibration', 'fitted', fixture_id, replication, purpose, evaluation_rows?)",
+    "reference": "derive_seed('calibration', 'reference', replication, evaluation_rows, purpose)",
+    "seed_function": "research.gate0.config.derive_seed"
+  },
+  "schema": "null-calibration-exact-seed-correction",
+  "seed_columns": [
+    "fixture_seed",
+    "residual_seed",
+    "evaluation_seed",
+    "left_seed",
+    "right_seed",
+    "permutation_seed"
+  ],
+  "source_revision": "446be3b014dfa87bfc0bf5d6f6fa1c39da552999",
+  "version": "v1"
+}
