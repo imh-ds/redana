@@ -1,3 +1,7 @@
+import hashlib
+import json
+import subprocess
+import sys
 import warnings
 from pathlib import Path
 
@@ -82,6 +86,82 @@ def test_calibration_records_name_the_empirical_permutation_p_value(tmp_path: Pa
     )
 
     assert "permutation_p_value" in frame
+
+
+def test_calibration_csv_round_trip_preserves_exact_nullable_seed_values(tmp_path: Path) -> None:
+    """A CSV reader using strings sees every nullable seed without float coercion."""
+
+    frame = run_calibration(
+        tmp_path,
+        "exact-seeds",
+        CalibrationConfig(replications=1, source_rows=300, evaluation_sizes=(250,), permutations=19),
+    )
+
+    persisted = pd.read_csv(tmp_path / "records.csv", dtype="string")
+    fitted = persisted.loc[(persisted.arm == "fitted") & (persisted.fixture_id == "F1")].iloc[0]
+    reference = persisted.loc[persisted.arm == "reference"].iloc[0]
+
+    assert int(frame.loc[(frame.arm == "fitted") & (frame.fixture_id == "F1"), "fixture_seed"].item()) > 2**53
+    assert fitted.fixture_seed == "6433342065636847493"
+    assert fitted.residual_seed == "17936904942616992301"
+    assert fitted.evaluation_seed == "14107422319196904710"
+    assert fitted.permutation_seed == "3384096685922538534"
+    assert pd.isna(reference.fixture_seed)
+    assert pd.isna(reference.residual_seed)
+    assert pd.isna(reference.evaluation_seed)
+    assert pd.isna(fitted.left_seed)
+    assert pd.isna(fitted.right_seed)
+
+
+def test_seed_correction_sidecar_derives_exact_values_from_record_identities(tmp_path: Path) -> None:
+    """Corrupted source seed text cannot affect the exact correction sidecar."""
+
+    records = tmp_path / "records.csv"
+    records.write_text(
+        "run_id,arm,fixture_id,replication,evaluation_rows,fixture_seed\n"
+        "unit,fitted,F1,0,250,6.433342065636848e+18\n"
+        "unit,reference,reference,0,250,\n",
+        encoding="utf-8",
+    )
+    output_dir = tmp_path.parent / "seed-correction-v1"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/write_null_calibration_seed_correction.py",
+            "--records",
+            str(records),
+            "--output-dir",
+            str(output_dir),
+            "--version",
+            "v1",
+        ],
+        capture_output=True,
+        check=False,
+        cwd=Path(__file__).resolve().parents[2],
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    sidecar = pd.read_csv(output_dir / "exact-seeds.csv", dtype="string")
+    fitted = sidecar.loc[sidecar.arm == "fitted"].iloc[0]
+    reference = sidecar.loc[sidecar.arm == "reference"].iloc[0]
+    manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
+
+    assert fitted.fixture_seed == "6433342065636847493"
+    assert fitted.residual_seed == "17936904942616992301"
+    assert fitted.evaluation_seed == "14107422319196904710"
+    assert fitted.permutation_seed == "3384096685922538534"
+    assert pd.isna(fitted.left_seed)
+    assert pd.isna(fitted.right_seed)
+    assert pd.isna(reference.fixture_seed)
+    assert pd.isna(reference.residual_seed)
+    assert pd.isna(reference.evaluation_seed)
+    assert reference.left_seed == "17926931931858939750"
+    assert reference.right_seed == "9070928938777396677"
+    assert reference.permutation_seed == "1079019629264358956"
+    assert manifest["original_records_sha256"] == hashlib.sha256(records.read_bytes()).hexdigest()
+    assert manifest["schedule"] == "calibration-v1"
+    assert manifest["version"] == "v1"
 
 
 def test_calibration_retains_a_fitted_arm_exception(monkeypatch, tmp_path: Path) -> None:

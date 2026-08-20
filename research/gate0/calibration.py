@@ -19,6 +19,14 @@ from research.gate0.residuals import cross_fitted_pair_residuals
 
 CALIBRATION_FIXTURES = ("F1", "F4", "F5", "F6")
 EVALUATION_SIZES = (250, 500, 1_000, 2_000)
+SEED_COLUMNS = (
+    "fixture_seed",
+    "residual_seed",
+    "evaluation_seed",
+    "left_seed",
+    "right_seed",
+    "permutation_seed",
+)
 
 
 @dataclass(frozen=True)
@@ -390,6 +398,17 @@ def _initialize_run(output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
 
+def _records_frame(records: list[CalibrationRecord]) -> pd.DataFrame:
+    """Build records with nullable seeds preserved as exact unsigned 64-bit values."""
+
+    frame = pd.DataFrame(asdict(record) for record in records)
+    for column in SEED_COLUMNS:
+        frame[column] = pd.Series(
+            [getattr(record, column) for record in records], dtype="UInt64"
+        )
+    return frame
+
+
 def run_calibration(output_dir: Path, run_id: str, config: CalibrationConfig) -> pd.DataFrame:
     """Run and persist the frozen fitted-residual and reference calibration arms."""
 
@@ -418,7 +437,7 @@ def run_calibration(output_dir: Path, run_id: str, config: CalibrationConfig) ->
                 )
             )
 
-    frame = pd.DataFrame(asdict(record) for record in records)
+    frame = _records_frame(records)
     frame.insert(0, "run_id", run_id)
     frame.to_csv(output_dir / "records.csv", index=False)
     _write_json(
