@@ -55,7 +55,7 @@ class CalibrationRecord:
 
 
 def run_reference_cell(
-    *, evaluation_rows: int, replication: int, permutations: int
+    *, evaluation_rows: int, replication: int, permutations: int, output_dir: Path | None = None
 ) -> CalibrationRecord:
     """Run a seeded independent-standard-normal reference calculation."""
 
@@ -66,6 +66,7 @@ def run_reference_cell(
     )
     started = time.perf_counter()
     caught_warnings: list[warnings.WarningMessage] = []
+    null_statistics_path: str | None = None
 
     try:
         with warnings.catch_warnings(record=True) as caught_warnings:
@@ -73,6 +74,10 @@ def run_reference_cell(
             left = np.random.default_rng(left_seed).standard_normal(evaluation_rows)
             right = np.random.default_rng(right_seed).standard_normal(evaluation_rows)
             result = permutation_distance_correlation(left, right, permutations, permutation_seed)
+            if output_dir is not None:
+                null_path = _reference_null_path(output_dir, replication, evaluation_rows)
+                _write_null_statistics(null_path, result.null_statistics)
+                null_statistics_path = null_path.relative_to(output_dir).as_posix()
         warning_text = "; ".join(str(item.message) for item in caught_warnings) or ""
         return CalibrationRecord(
             arm="reference",
@@ -81,7 +86,7 @@ def run_reference_cell(
             evaluation_rows=evaluation_rows,
             observed_statistic=result.observed,
             p_value=result.p_value,
-            null_statistics_path=None,
+            null_statistics_path=null_statistics_path,
             residual_sample_path=None,
             fixture_seed=None,
             residual_seed=None,
@@ -101,7 +106,7 @@ def run_reference_cell(
             evaluation_rows=evaluation_rows,
             observed_statistic=None,
             p_value=None,
-            null_statistics_path=None,
+            null_statistics_path=null_statistics_path,
             residual_sample_path=None,
             fixture_seed=None,
             residual_seed=None,
@@ -157,6 +162,40 @@ def _calibration_profile(config: CalibrationConfig, evaluation_rows: int) -> Com
     )
 
 
+def _reference_null_path(output_dir: Path, replication: int, evaluation_rows: int) -> Path:
+    return (
+        output_dir
+        / "reference"
+        / "null_statistics"
+        / f"replication-{replication}-evaluation-{evaluation_rows}.npy"
+    )
+
+
+def _write_null_statistics(path: Path, null_statistics: np.ndarray) -> None:
+    """Atomically retain one permutation sample without a partial final artifact."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_name(f".{path.name}.tmp")
+    try:
+        with temporary_path.open("wb") as stream:
+            np.save(stream, null_statistics)
+        temporary_path.replace(path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def _write_residual_sample(path: Path, evaluation: pd.DataFrame) -> None:
+    """Atomically retain one residual sample without a partial final artifact."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_name(f".{path.name}.tmp")
+    try:
+        evaluation.to_csv(temporary_path, index=False)
+        temporary_path.replace(path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
 def _fitted_record(
     *,
     fixture_id: str,
@@ -182,8 +221,8 @@ def _fitted_record(
             evaluation_rows=evaluation_rows,
             observed_statistic=None,
             p_value=None,
-            null_statistics_path=None,
-            residual_sample_path=None,
+            null_statistics_path=null_statistics_path,
+            residual_sample_path=residual_sample_path,
             fixture_seed=fixture_seed,
             residual_seed=residual_seed,
             evaluation_seed=evaluation_seed,
@@ -224,11 +263,10 @@ def _run_fitted_cells(
     fixture_seed = _fitted_seed(fixture_id, replication, "fixture")
     residual_seed = _fitted_seed(fixture_id, replication, "residual")
     started = time.perf_counter()
-    caught_warnings: list[warnings.WarningMessage] = []
     records: list[CalibrationRecord] = []
 
     try:
-        with warnings.catch_warnings(record=True) as caught_warnings:
+        with warnings.catch_warnings(record=True) as setup_warnings:
             warnings.simplefilter("always")
             frame = generate_fixture(fixture_id, config.source_rows, fixture_seed)
             residuals = cross_fitted_pair_residuals(
@@ -238,73 +276,6 @@ def _run_fitted_cells(
                 Gate0Config(_calibration_profile(config, max(config.evaluation_sizes))),
                 _sklearn_seed(residual_seed),
             )
-            for evaluation_rows in config.evaluation_sizes:
-                evaluation_seed = _fitted_seed(fixture_id, replication, "evaluation", evaluation_rows)
-                permutation_seed = _fitted_seed(
-                    fixture_id, replication, "permutation", evaluation_rows
-                )
-                try:
-                    evaluation_index = np.random.default_rng(evaluation_seed).choice(
-                        residuals.index.to_numpy(), size=evaluation_rows, replace=False
-                    )
-                    evaluation = residuals.loc[evaluation_index, [left, right]]
-                    result = permutation_distance_correlation(
-                        evaluation[left].to_numpy(),
-                        evaluation[right].to_numpy(),
-                        config.permutations,
-                        permutation_seed,
-                    )
-                    null_statistics_path = None
-                    residual_sample_path = None
-                    if output_dir is not None:
-                        artifact_dir = output_dir / "fitted"
-                        null_path = (
-                            artifact_dir
-                            / "null_statistics"
-                            / f"{fixture_id}-replication-{replication}-evaluation-{evaluation_rows}.npy"
-                        )
-                        sample_path = (
-                            artifact_dir
-                            / "residual_samples"
-                            / f"{fixture_id}-replication-{replication}-evaluation-{evaluation_rows}.csv"
-                        )
-                        null_path.parent.mkdir(parents=True, exist_ok=True)
-                        np.save(null_path, result.null_statistics)
-                        sample_path.parent.mkdir(parents=True, exist_ok=True)
-                        evaluation.to_csv(sample_path, index=False)
-                        null_statistics_path = str(null_path.relative_to(output_dir))
-                        residual_sample_path = str(sample_path.relative_to(output_dir))
-                    records.append(
-                        _fitted_record(
-                            fixture_id=fixture_id,
-                            replication=replication,
-                            evaluation_rows=evaluation_rows,
-                            fixture_seed=fixture_seed,
-                            residual_seed=residual_seed,
-                            evaluation_seed=evaluation_seed,
-                            permutation_seed=permutation_seed,
-                            started=started,
-                            caught_warnings=caught_warnings,
-                            result=result,
-                            null_statistics_path=null_statistics_path,
-                            residual_sample_path=residual_sample_path,
-                        )
-                    )
-                except Exception as error:  # noqa: BLE001 - every cell must be retained.
-                    records.append(
-                        _fitted_record(
-                            fixture_id=fixture_id,
-                            replication=replication,
-                            evaluation_rows=evaluation_rows,
-                            fixture_seed=fixture_seed,
-                            residual_seed=residual_seed,
-                            evaluation_seed=evaluation_seed,
-                            permutation_seed=permutation_seed,
-                            started=started,
-                            caught_warnings=caught_warnings,
-                            exception=error,
-                        )
-                    )
     except Exception as error:  # noqa: BLE001 - failed fitted setup must retain every cell.
         for evaluation_rows in config.evaluation_sizes:
             records.append(
@@ -321,7 +292,77 @@ def _run_fitted_cells(
                         fixture_id, replication, "permutation", evaluation_rows
                     ),
                     started=started,
-                    caught_warnings=caught_warnings,
+                    caught_warnings=setup_warnings,
+                    exception=error,
+                )
+            )
+        return records
+
+    for evaluation_rows in config.evaluation_sizes:
+        evaluation_seed = _fitted_seed(fixture_id, replication, "evaluation", evaluation_rows)
+        permutation_seed = _fitted_seed(fixture_id, replication, "permutation", evaluation_rows)
+        null_statistics_path = None
+        residual_sample_path = None
+        cell_warnings: list[warnings.WarningMessage] = []
+        try:
+            with warnings.catch_warnings(record=True) as cell_warnings:
+                warnings.simplefilter("always")
+                evaluation_index = np.random.default_rng(evaluation_seed).choice(
+                    residuals.index.to_numpy(), size=evaluation_rows, replace=False
+                )
+                evaluation = residuals.loc[evaluation_index, [left, right]]
+                result = permutation_distance_correlation(
+                    evaluation[left].to_numpy(),
+                    evaluation[right].to_numpy(),
+                    config.permutations,
+                    permutation_seed,
+                )
+                if output_dir is not None:
+                    artifact_dir = output_dir / "fitted"
+                    null_path = (
+                        artifact_dir
+                        / "null_statistics"
+                        / f"{fixture_id}-replication-{replication}-evaluation-{evaluation_rows}.npy"
+                    )
+                    sample_path = (
+                        artifact_dir
+                        / "residual_samples"
+                        / f"{fixture_id}-replication-{replication}-evaluation-{evaluation_rows}.csv"
+                    )
+                    _write_null_statistics(null_path, result.null_statistics)
+                    null_statistics_path = null_path.relative_to(output_dir).as_posix()
+                    _write_residual_sample(sample_path, evaluation)
+                    residual_sample_path = sample_path.relative_to(output_dir).as_posix()
+            records.append(
+                _fitted_record(
+                    fixture_id=fixture_id,
+                    replication=replication,
+                    evaluation_rows=evaluation_rows,
+                    fixture_seed=fixture_seed,
+                    residual_seed=residual_seed,
+                    evaluation_seed=evaluation_seed,
+                    permutation_seed=permutation_seed,
+                    started=started,
+                    caught_warnings=[*setup_warnings, *cell_warnings],
+                    result=result,
+                    null_statistics_path=null_statistics_path,
+                    residual_sample_path=residual_sample_path,
+                )
+            )
+        except Exception as error:  # noqa: BLE001 - every cell must be retained.
+            records.append(
+                _fitted_record(
+                    fixture_id=fixture_id,
+                    replication=replication,
+                    evaluation_rows=evaluation_rows,
+                    fixture_seed=fixture_seed,
+                    residual_seed=residual_seed,
+                    evaluation_seed=evaluation_seed,
+                    permutation_seed=permutation_seed,
+                    started=started,
+                    caught_warnings=[*setup_warnings, *cell_warnings],
+                    null_statistics_path=null_statistics_path,
+                    residual_sample_path=residual_sample_path,
                     exception=error,
                 )
             )
@@ -373,6 +414,7 @@ def run_calibration(output_dir: Path, run_id: str, config: CalibrationConfig) ->
                     evaluation_rows=evaluation_rows,
                     replication=replication,
                     permutations=config.permutations,
+                    output_dir=output_dir,
                 )
             )
 
