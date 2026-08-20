@@ -138,7 +138,7 @@ def test_report_writes_evidence_and_stops_for_unexpected_null_like(tmp_path) -> 
         "spline_knot_strategy": "quantile",
         "spline_knots": 5,
     }
-    assert manifest["frozen_protocol"]["fixture_generation"] == {
+    assert manifest["frozen_protocol"]["fixture_generation"].items() >= {
         "coefficient": 0.7,
         "linear_relationship": "0.7x",
         "noise_distribution": "independent standard Gaussian",
@@ -146,7 +146,7 @@ def test_report_writes_evidence_and_stops_for_unexpected_null_like(tmp_path) -> 
         "noise_standard_deviation": 1.0,
         "quadratic_centered": True,
         "quadratic_relationship": "0.7(x^2 - 1)",
-    }
+    }.items()
     assert manifest["frozen_protocol"]["procedure"] == {
         "adjustment_set": "all observed variables except both pair endpoints",
         "data_type": "continuous simulated data",
@@ -243,3 +243,102 @@ def test_report_rejects_records_from_a_different_run_before_writing(tmp_path) ->
         write_gate_report(records, tmp_path, run_id="new-run")
 
     assert not (tmp_path / "records.csv").exists()
+
+
+def test_manifest_and_memo_preserve_the_complete_frozen_protocol(tmp_path) -> None:
+    records = _complete_frozen_records()
+    records["profile"] = "reduced"
+    records["run_id"] = "protocol-run"
+
+    memo_path = write_gate_report(records, tmp_path, run_id="protocol-run")
+
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    protocol = manifest["frozen_protocol"]
+    assert protocol["fixture_generation"]["equations"] == {
+        "F1": "X1=e1; X2=e2; X3=e3; X4=e4; X5=e5; X6=e6",
+        "F2": "X1=e1; X2=0.7*X1+e2; X3=e3; X4=e4; X5=e5; X6=e6",
+        "F3": "X1=e1; X2=0.7*(X1**2-1)+e2; X3=e3; X4=e4; X5=e5; X6=e6",
+        "F4": "X1=e1; X2=0.7*X1+e2; X3=0.7*X2+e3; X4=e4; X5=e5; X6=e6",
+        "F5": "X3=e3; X1=0.7*(X3**2-1)+e1; X2=0.7*(X3**2-1)+e2; X4=e4; X5=e5; X6=e6",
+        "F6": "X1=e1; X2=0.7*(X1**2-1)+e2; X3=0.7*X2+e3; X4=e4; X5=e5; X6=e6",
+        "F7": "X1=e1; X2=e2; X3=0.7*X1+0.7*X2+e3; X4=e4; X5=e5; X6=e6",
+        "F8": "X1=e1; X3=0.7*X1+e3; X2=0.7*X1+0.7*X3+e2; X4=e4; X5=e5; X6=e6",
+    }
+    assert protocol["fixture_evaluations"] == {
+        "F1": {
+            "target_pair": ["X1", "X2"],
+            "null_control_pair": ["X4", "X5"],
+            "expected_target_class": "null-like",
+            "expected_null_control_class": "null-like",
+        },
+        "F2": {
+            "target_pair": ["X1", "X2"],
+            "null_control_pair": ["X4", "X5"],
+            "expected_target_class": "non-null",
+            "expected_null_control_class": "null-like",
+        },
+        "F3": {
+            "target_pair": ["X1", "X2"],
+            "null_control_pair": ["X4", "X5"],
+            "expected_target_class": "non-null",
+            "expected_null_control_class": "null-like",
+        },
+        "F4": {
+            "target_pair": ["X1", "X3"],
+            "null_control_pair": ["X4", "X5"],
+            "expected_target_class": "null-like",
+            "expected_null_control_class": "null-like",
+        },
+        "F5": {
+            "target_pair": ["X1", "X2"],
+            "null_control_pair": ["X4", "X5"],
+            "expected_target_class": "null-like",
+            "expected_null_control_class": "null-like",
+        },
+        "F6": {
+            "target_pair": ["X1", "X3"],
+            "null_control_pair": ["X4", "X5"],
+            "expected_target_class": "null-like",
+            "expected_null_control_class": "null-like",
+        },
+        "F7": {
+            "target_pair": ["X1", "X2"],
+            "null_control_pair": ["X4", "X5"],
+            "expected_target_class": "non-null",
+            "expected_null_control_class": "null-like",
+        },
+        "F8": {
+            "target_pair": ["X1", "X2"],
+            "null_control_pair": ["X4", "X5"],
+            "expected_target_class": "non-null",
+            "expected_null_control_class": "null-like",
+        },
+    }
+    assert protocol["fixture_generation"]["post_generation_standardization"] == (
+        "Each X1-X6 column is centered by its generated sample mean and scaled by its "
+        "generated population standard deviation (ddof=0)."
+    )
+    assert protocol["seed_derivation"] == {
+        "algorithm": "SHA-256",
+        "identity_rule": "Join fixture, replication, pair, and permutation identities with '|' as UTF-8; use the first eight digest bytes as an unsigned big-endian integer.",
+        "execution_order_independent": True,
+    }
+    assert protocol["permutation_p_value"] == "(1 + count(null >= observed)) / (B + 1)"
+    assert protocol["classification_thresholds"] == {
+        "null-like": "At most 2 of 10 p-values <= 0.05 and median observed distance correlation < 0.05.",
+        "non-null": "At least 8 of 10 p-values <= 0.01 and median observed distance correlation >= 0.10.",
+        "ambiguous": "Any other result.",
+    }
+    assert protocol["fixture_gate_thresholds"] == {
+        "PASS": "Every target matches its expected class and every null-control pair is null-like.",
+        "STOP": "Any unexpected non-null target/control result or expected direct-dependence target that is null-like.",
+        "NARROW": "Any remaining ambiguity.",
+    }
+
+    memo = memo_path.read_text(encoding="utf-8")
+    assert "## Exact fixture equations and evaluation pairs" in memo
+    assert "| F8 | X1=e1; X3=0.7*X1+e3; X2=0.7*X1+0.7*X3+e2; X4=e4; X5=e5; X6=e6 | X1, X2 | X4, X5 | non-null | null-like |" in memo
+    assert "Post-generation standardization: Each X1-X6 column is centered" in memo
+    assert "Seed derivation: Join fixture, replication, pair, and permutation identities" in memo
+    assert "Empirical permutation p-value: `(1 + count(null >= observed)) / (B + 1)`" in memo
+    assert "## Pair and fixture gate thresholds" in memo

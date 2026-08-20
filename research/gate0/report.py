@@ -34,6 +34,16 @@ _PROFILE_BY_NAME = {profile.name: profile for profile in (FULL_PROFILE, REDUCED_
 _GROUP_COLUMNS = ["fixture_id", "pair_role"]
 _FROZEN_FIXTURE_IDS = tuple(f"F{number}" for number in range(1, 9))
 _FROZEN_ROLES = ("target", "null_control")
+_FIXTURE_EQUATIONS = {
+    "F1": "X1=e1; X2=e2; X3=e3; X4=e4; X5=e5; X6=e6",
+    "F2": "X1=e1; X2=0.7*X1+e2; X3=e3; X4=e4; X5=e5; X6=e6",
+    "F3": "X1=e1; X2=0.7*(X1**2-1)+e2; X3=e3; X4=e4; X5=e5; X6=e6",
+    "F4": "X1=e1; X2=0.7*X1+e2; X3=0.7*X2+e3; X4=e4; X5=e5; X6=e6",
+    "F5": "X3=e3; X1=0.7*(X3**2-1)+e1; X2=0.7*(X3**2-1)+e2; X4=e4; X5=e5; X6=e6",
+    "F6": "X1=e1; X2=0.7*(X1**2-1)+e2; X3=0.7*X2+e3; X4=e4; X5=e5; X6=e6",
+    "F7": "X1=e1; X2=e2; X3=0.7*X1+0.7*X2+e3; X4=e4; X5=e5; X6=e6",
+    "F8": "X1=e1; X3=0.7*X1+e3; X2=0.7*X1+0.7*X3+e2; X4=e4; X5=e5; X6=e6",
+}
 _REQUIRED_MATRIX_COLUMNS = {
     "fixture_id",
     "replication",
@@ -307,6 +317,48 @@ def _frozen_protocol(profile: ComputationalProfile) -> dict[str, Any]:
             "noise_distribution": FIXTURE_NOISE_DISTRIBUTION,
             "noise_mean": FIXTURE_NOISE_MEAN,
             "noise_standard_deviation": FIXTURE_NOISE_STANDARD_DEVIATION,
+            "equations": _FIXTURE_EQUATIONS,
+            "post_generation_standardization": (
+                "Each X1-X6 column is centered by its generated sample mean and scaled by its "
+                "generated population standard deviation (ddof=0)."
+            ),
+        },
+        "fixture_evaluations": {
+            fixture_id: {
+                "target_pair": list(definition.target_pair),
+                "null_control_pair": list(definition.null_control_pair),
+                "expected_target_class": definition.expected_target_class,
+                "expected_null_control_class": "null-like",
+            }
+            for fixture_id, definition in FIXTURES.items()
+        },
+        "seed_derivation": {
+            "algorithm": "SHA-256",
+            "identity_rule": (
+                "Join fixture, replication, pair, and permutation identities with '|' as UTF-8; "
+                "use the first eight digest bytes as an unsigned big-endian integer."
+            ),
+            "execution_order_independent": True,
+        },
+        "permutation_p_value": "(1 + count(null >= observed)) / (B + 1)",
+        "classification_thresholds": {
+            "null-like": (
+                "At most 2 of 10 p-values <= 0.05 and median observed distance correlation < 0.05."
+            ),
+            "non-null": (
+                "At least 8 of 10 p-values <= 0.01 and median observed distance correlation >= 0.10."
+            ),
+            "ambiguous": "Any other result.",
+        },
+        "fixture_gate_thresholds": {
+            "PASS": (
+                "Every target matches its expected class and every null-control pair is null-like."
+            ),
+            "STOP": (
+                "Any unexpected non-null target/control result or expected direct-dependence "
+                "target that is null-like."
+            ),
+            "NARROW": "Any remaining ambiguity.",
         },
         "dependencies": _dependency_versions(),
         "source_revision": _source_revision(),
@@ -318,6 +370,10 @@ def _protocol_memo_lines(protocol: dict[str, Any]) -> list[str]:
     procedure = protocol["procedure"]
     model = protocol["adjustment_model"]
     fixture = protocol["fixture_generation"]
+    evaluations = protocol["fixture_evaluations"]
+    seed = protocol["seed_derivation"]
+    classifications = protocol["classification_thresholds"]
+    gate = protocol["fixture_gate_thresholds"]
     lines = [
         "## Frozen configuration required by the specification",
         "",
@@ -354,6 +410,42 @@ def _protocol_memo_lines(protocol: dict[str, Any]) -> list[str]:
     lines.extend(
         f"- {name}: {dependency_version}"
         for name, dependency_version in protocol["dependencies"].items()
+    )
+    lines.extend(
+        [
+            "",
+            "## Exact fixture equations and evaluation pairs",
+            "",
+            "| Fixture | Generating equation | Target pair | Null-control pair | Expected target | Expected control |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    lines.extend(
+        f"| {fixture_id} | {fixture['equations'][fixture_id]} | "
+        f"{', '.join(evaluations[fixture_id]['target_pair'])} | "
+        f"{', '.join(evaluations[fixture_id]['null_control_pair'])} | "
+        f"{evaluations[fixture_id]['expected_target_class']} | "
+        f"{evaluations[fixture_id]['expected_null_control_class']} |"
+        for fixture_id in _FROZEN_FIXTURE_IDS
+    )
+    lines.extend(
+        [
+            "",
+            f"Post-generation standardization: {fixture['post_generation_standardization']}",
+            "",
+            f"Seed derivation: {seed['identity_rule']}",
+            "",
+            f"Empirical permutation p-value: `{protocol['permutation_p_value']}`",
+            "",
+            "## Pair and fixture gate thresholds",
+            "",
+            f"- null-like: {classifications['null-like']}",
+            f"- non-null: {classifications['non-null']}",
+            f"- ambiguous: {classifications['ambiguous']}",
+            f"- PASS: {gate['PASS']}",
+            f"- STOP: {gate['STOP']}",
+            f"- NARROW: {gate['NARROW']}",
+        ]
     )
     return lines
 
