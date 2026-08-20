@@ -107,6 +107,8 @@ def _has_exact_frozen_matrix(records: pd.DataFrame) -> bool:
     if len(records) != len(expected_identities):
         return False
 
+    if records["replication"].map(lambda value: isinstance(value, (bool, np.bool_))).any():
+        return False
     replications = pd.to_numeric(records["replication"], errors="coerce")
     if replications.isna().any() or (replications % 1 != 0).any():
         return False

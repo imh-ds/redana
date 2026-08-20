@@ -68,6 +68,14 @@ def test_gate_status_stops_for_a_duplicate_frozen_matrix_record() -> None:
     assert gate_status(records) == "STOP"
 
 
+def test_gate_status_stops_for_boolean_replication_value() -> None:
+    records = _complete_frozen_records()
+    records["replication"] = records["replication"].astype(object)
+    records.loc[records.index[0], "replication"] = False
+
+    assert gate_status(records) == "STOP"
+
+
 def test_gate_status_stops_for_a_record_that_contradicts_the_fixture_registry() -> None:
     records = _complete_frozen_records()
     f1_target = (records["fixture_id"] == "F1") & (records["pair_role"] == "target")
