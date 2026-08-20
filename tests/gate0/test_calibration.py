@@ -13,6 +13,41 @@ from research.gate0.calibration import (
     run_reference_cell,
 )
 from research.gate0.calibration import permutation_distance_correlation as real_metric
+from scripts import run_null_calibration as calibration_cli
+
+
+def test_calibration_cli_refuses_to_overwrite_completed_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "run"
+
+    def fake_run_calibration(output_dir: Path, run_id: str, _config: object) -> pd.DataFrame:
+        output_dir.mkdir(parents=True)
+        (output_dir / "records.csv").write_text(f"run_id\n{run_id}\n", encoding="utf-8")
+        return pd.DataFrame(
+            {
+                "run_id": [run_id],
+                "arm": ["reference"],
+                "exception_text": [None],
+                "permutation_p_value": [0.5],
+                "evaluation_rows": [250],
+                "observed_statistic": [0.01],
+            }
+        )
+
+    def fake_write_report(_records: pd.DataFrame, output_dir: Path) -> Path:
+        memo = output_dir / "calibration-memo.md"
+        memo.write_text("diagnostic evidence\n", encoding="utf-8")
+        return memo
+
+    monkeypatch.setattr(calibration_cli, "run_calibration", fake_run_calibration)
+    monkeypatch.setattr(calibration_cli, "write_calibration_report", fake_write_report)
+
+    first = calibration_cli.main(["--output-dir", str(output), "--run-id", "calibration-unit"])
+    second = calibration_cli.main(["--output-dir", str(output), "--run-id", "calibration-unit"])
+
+    assert first == 0
+    assert second != 0
 
 
 def test_calibration_matrix_is_frozen() -> None:
