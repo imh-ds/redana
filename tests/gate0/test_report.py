@@ -2,6 +2,7 @@ import json
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from research.gate0.report import classify_pair, gate_status, write_gate_report
 
@@ -110,7 +111,7 @@ def test_report_writes_evidence_and_stops_for_unexpected_null_like(tmp_path) -> 
     }
     records = pd.DataFrame(target_rows)
 
-    memo_path = write_gate_report(records, tmp_path)
+    memo_path = write_gate_report(records, tmp_path, run_id="run-1")
 
     assert memo_path == tmp_path / "gate-memo.md"
     assert (tmp_path / "records.csv").exists()
@@ -118,7 +119,65 @@ def test_report_writes_evidence_and_stops_for_unexpected_null_like(tmp_path) -> 
     assert (tmp_path / "plots" / "F7-residual-scatter.png").exists()
     manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["gate_status"] == "STOP"
+    assert manifest["run_id"] == "run-1"
+    assert manifest["frozen_protocol"]["profile"] == {
+        "evaluation_rows": 750,
+        "name": "reduced",
+        "permutations": 99,
+        "replications": 10,
+        "source_rows": 20_000,
+    }
+    assert manifest["frozen_protocol"]["adjustment_model"] == {
+        "cross_fitting": True,
+        "estimator": "Ridge",
+        "n_splits": 5,
+        "ridge_alpha": 1.0,
+        "scaler": "StandardScaler",
+        "spline_degree": 3,
+        "spline_include_bias": False,
+        "spline_knot_strategy": "quantile",
+        "spline_knots": 5,
+    }
+    assert manifest["frozen_protocol"]["fixture_generation"] == {
+        "coefficient": 0.7,
+        "linear_relationship": "0.7x",
+        "noise_distribution": "independent standard Gaussian",
+        "noise_mean": 0.0,
+        "noise_standard_deviation": 1.0,
+        "quadratic_centered": True,
+        "quadratic_relationship": "0.7(x^2 - 1)",
+    }
+    assert manifest["frozen_protocol"]["procedure"] == {
+        "adjustment_set": "all observed variables except both pair endpoints",
+        "data_type": "continuous simulated data",
+        "dependence_statistic": "distance correlation",
+        "fixture_ids": [f"F{number}" for number in range(1, 9)],
+        "observed_variables": 6,
+        "permutation_reference": "permute one residual vector",
+        "residuals": "pair-specific out-of-sample predictions",
+    }
+    assert manifest["frozen_protocol"]["source_revision"]
+    assert set(manifest["frozen_protocol"]["dependencies"]) == {
+        "dcor",
+        "matplotlib",
+        "numpy",
+        "pandas",
+        "python",
+        "scikit-learn",
+    }
     memo = memo_path.read_text(encoding="utf-8")
+    assert "Run ID: run-1" in memo
+    assert "Frozen configuration required by the specification" in memo
+    assert "Source rows | 20000" in memo
+    assert "Evaluation rows | 750" in memo
+    assert "Replications | 10" in memo
+    assert "Permutations | 99" in memo
+    assert "Cross-fitting folds | 5" in memo
+    assert "Spline knots | 5" in memo
+    assert "Spline degree | 3" in memo
+    assert "Ridge alpha | 1.0" in memo
+    assert "Fixture coefficient | 0.7" in memo
+    assert "independent standard Gaussian" in memo
     assert "F7 collider interpretation" in memo
     assert "induced conditional dependence—not a direct causal relationship" in memo
     assert memo.rstrip().endswith(
@@ -149,7 +208,7 @@ def test_report_manifest_records_the_single_replication_used_for_both_figures(tm
         }
     )
 
-    write_gate_report(records, tmp_path)
+    write_gate_report(records, tmp_path, run_id="run-1")
 
     manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["representatives"] == [
@@ -162,3 +221,25 @@ def test_report_manifest_records_the_single_replication_used_for_both_figures(tm
             "null_statistics_path": str(null_path.relative_to(tmp_path)),
         }
     ]
+
+
+def test_report_rejects_records_from_a_different_run_before_writing(tmp_path) -> None:
+    records = pd.DataFrame(
+        {
+            "fixture_id": ["F1"],
+            "replication": [0],
+            "pair_role": ["target"],
+            "expected_class": ["null-like"],
+            "left": ["X1"],
+            "right": ["X2"],
+            "observed_statistic": [0.02],
+            "permutation_p_value": [0.5],
+            "profile": ["reduced"],
+            "run_id": ["old-run"],
+        }
+    )
+
+    with pytest.raises(ValueError, match="run_id"):
+        write_gate_report(records, tmp_path, run_id="new-run")
+
+    assert not (tmp_path / "records.csv").exists()

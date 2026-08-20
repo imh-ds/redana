@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
-from research.gate0.config import derive_seed
+from research.gate0.config import FIXTURE_COEFFICIENT, derive_seed
 
 
 @dataclass(frozen=True)
@@ -46,23 +46,37 @@ def generate_fixture(fixture_id: str, rows: int, seed: int) -> pd.DataFrame:
     if fixture_id == "F1":
         values = [e1, e2, e3, e4, e5, e6]
     elif fixture_id == "F2":
-        values = [e1, 0.7 * e1 + e2, e3, e4, e5, e6]
+        values = [e1, FIXTURE_COEFFICIENT * e1 + e2, e3, e4, e5, e6]
     elif fixture_id == "F3":
-        values = [e1, 0.7 * (e1**2 - 1) + e2, e3, e4, e5, e6]
+        values = [e1, FIXTURE_COEFFICIENT * (e1**2 - 1) + e2, e3, e4, e5, e6]
     elif fixture_id == "F4":
-        x2 = 0.7 * e1 + e2
-        values = [e1, x2, 0.7 * x2 + e3, e4, e5, e6]
+        x2 = FIXTURE_COEFFICIENT * e1 + e2
+        values = [e1, x2, FIXTURE_COEFFICIENT * x2 + e3, e4, e5, e6]
     elif fixture_id == "F5":
-        parent = 0.7 * (e3**2 - 1)
+        parent = FIXTURE_COEFFICIENT * (e3**2 - 1)
         values = [parent + e1, parent + e2, e3, e4, e5, e6]
     elif fixture_id == "F6":
-        x2 = 0.7 * (e1**2 - 1) + e2
-        values = [e1, x2, 0.7 * x2 + e3, e4, e5, e6]
+        x2 = FIXTURE_COEFFICIENT * (e1**2 - 1) + e2
+        values = [e1, x2, FIXTURE_COEFFICIENT * x2 + e3, e4, e5, e6]
     elif fixture_id == "F7":
-        values = [e1, e2, 0.7 * e1 + 0.7 * e2 + e3, e4, e5, e6]
+        values = [
+            e1,
+            e2,
+            FIXTURE_COEFFICIENT * e1 + FIXTURE_COEFFICIENT * e2 + e3,
+            e4,
+            e5,
+            e6,
+        ]
     else:
-        x3 = 0.7 * e1 + e3
-        values = [e1, 0.7 * e1 + 0.7 * x3 + e2, x3, e4, e5, e6]
+        x3 = FIXTURE_COEFFICIENT * e1 + e3
+        values = [
+            e1,
+            FIXTURE_COEFFICIENT * e1 + FIXTURE_COEFFICIENT * x3 + e2,
+            x3,
+            e4,
+            e5,
+            e6,
+        ]
 
     frame = pd.DataFrame(dict(zip(_COLUMNS, values, strict=True)))
     return (frame - frame.mean()) / frame.std(ddof=0)

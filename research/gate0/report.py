@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import json
+import platform
+import subprocess
+from dataclasses import asdict
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
@@ -13,12 +17,20 @@ import pandas as pd
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from research.gate0.config import (
+    FIXTURE_COEFFICIENT,
+    FIXTURE_NOISE_DISTRIBUTION,
+    FIXTURE_NOISE_MEAN,
+    FIXTURE_NOISE_STANDARD_DEVIATION,
+    FULL_PROFILE,
+    OWNER_DECISION_SENTENCE,
+    REDUCED_PROFILE,
+    ComputationalProfile,
+    Gate0Config,
+)
 from research.gate0.fixtures import FIXTURES
 
-_FINAL_OWNER_DECISION = (
-    "Owner decision required; this result does not authorize estimator redesign, a new "
-    "simulation family, or package work."
-)
+_PROFILE_BY_NAME = {profile.name: profile for profile in (FULL_PROFILE, REDUCED_PROFILE)}
 _GROUP_COLUMNS = ["fixture_id", "pair_role"]
 _FROZEN_FIXTURE_IDS = tuple(f"F{number}" for number in range(1, 9))
 _FROZEN_ROLES = ("target", "null_control")
@@ -237,8 +249,127 @@ def _format_messages(records: pd.DataFrame, column: str) -> list[str]:
     return [f"- {value}" for value in values] or ["- None"]
 
 
-def write_gate_report(records: pd.DataFrame, output_dir: Path) -> Path:
+def _dependency_versions() -> dict[str, str]:
+    dependencies = {"python": platform.python_version()}
+    for distribution in ("numpy", "pandas", "scikit-learn", "dcor", "matplotlib"):
+        try:
+            dependencies[distribution] = version(distribution)
+        except PackageNotFoundError:
+            dependencies[distribution] = "unavailable"
+    return dependencies
+
+
+def _source_revision() -> str:
+    repository = Path(__file__).resolve().parents[2]
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repository,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return "unavailable"
+    revision = result.stdout.strip()
+    return revision if result.returncode == 0 and revision else "unavailable"
+
+
+def _frozen_protocol(profile: ComputationalProfile) -> dict[str, Any]:
+    config = Gate0Config(profile)
+    return {
+        "profile": asdict(profile),
+        "procedure": {
+            "data_type": "continuous simulated data",
+            "observed_variables": 6,
+            "fixture_ids": list(_FROZEN_FIXTURE_IDS),
+            "adjustment_set": "all observed variables except both pair endpoints",
+            "residuals": "pair-specific out-of-sample predictions",
+            "dependence_statistic": "distance correlation",
+            "permutation_reference": "permute one residual vector",
+        },
+        "adjustment_model": {
+            "cross_fitting": True,
+            "n_splits": config.n_splits,
+            "spline_knots": config.spline_knots,
+            "spline_degree": config.spline_degree,
+            "spline_include_bias": False,
+            "spline_knot_strategy": "quantile",
+            "scaler": "StandardScaler",
+            "estimator": "Ridge",
+            "ridge_alpha": config.ridge_alpha,
+        },
+        "fixture_generation": {
+            "coefficient": FIXTURE_COEFFICIENT,
+            "linear_relationship": "0.7x",
+            "quadratic_relationship": "0.7(x^2 - 1)",
+            "quadratic_centered": True,
+            "noise_distribution": FIXTURE_NOISE_DISTRIBUTION,
+            "noise_mean": FIXTURE_NOISE_MEAN,
+            "noise_standard_deviation": FIXTURE_NOISE_STANDARD_DEVIATION,
+        },
+        "dependencies": _dependency_versions(),
+        "source_revision": _source_revision(),
+    }
+
+
+def _protocol_memo_lines(protocol: dict[str, Any]) -> list[str]:
+    profile = protocol["profile"]
+    procedure = protocol["procedure"]
+    model = protocol["adjustment_model"]
+    fixture = protocol["fixture_generation"]
+    lines = [
+        "## Frozen configuration required by the specification",
+        "",
+        "| Setting | Value |",
+        "| --- | --- |",
+        f"| Source rows | {profile['source_rows']} |",
+        f"| Evaluation rows | {profile['evaluation_rows']} |",
+        f"| Replications | {profile['replications']} |",
+        f"| Permutations | {profile['permutations']} |",
+        f"| Cross-fitting folds | {model['n_splits']} |",
+        f"| Adjustment set | {procedure['adjustment_set']} |",
+        f"| Residuals | {procedure['residuals']} |",
+        f"| Spline knots | {model['spline_knots']} |",
+        f"| Spline degree | {model['spline_degree']} |",
+        f"| Spline knot strategy | {model['spline_knot_strategy']} |",
+        f"| Spline include bias | {model['spline_include_bias']} |",
+        f"| Feature scaler | {model['scaler']} |",
+        f"| Ridge alpha | {model['ridge_alpha']} |",
+        f"| Dependence statistic | {procedure['dependence_statistic']} |",
+        f"| Permutation reference | {procedure['permutation_reference']} |",
+        f"| Fixture coefficient | {fixture['coefficient']} |",
+        f"| Linear relationship | {fixture['linear_relationship']} |",
+        f"| Quadratic relationship | {fixture['quadratic_relationship']} |",
+        (
+            f"| Exogenous noise | {fixture['noise_distribution']}; mean "
+            f"{fixture['noise_mean']}; standard deviation "
+            f"{fixture['noise_standard_deviation']} |"
+        ),
+        f"| Source revision | {protocol['source_revision']} |",
+        "",
+        "Dependency versions:",
+        "",
+    ]
+    lines.extend(
+        f"- {name}: {dependency_version}"
+        for name, dependency_version in protocol["dependencies"].items()
+    )
+    return lines
+
+
+def write_gate_report(records: pd.DataFrame, output_dir: Path, *, run_id: str) -> Path:
     """Write raw records, figures, manifest, and a non-automatic owner memo."""
+
+    record_run_ids = sorted(
+        {str(value) for value in records.get("run_id", pd.Series(dtype=str)).dropna()}
+    )
+    if record_run_ids and record_run_ids != [run_id]:
+        raise ValueError("record run_id values do not match the requested run_id")
+    profiles = sorted({str(value) for value in records.get("profile", pd.Series(dtype=str)).dropna()})
+    if len(profiles) != 1 or profiles[0] not in _PROFILE_BY_NAME:
+        raise ValueError("records must contain exactly one approved substantive profile")
+    protocol = _frozen_protocol(_PROFILE_BY_NAME[profiles[0]])
 
     output_dir.mkdir(parents=True, exist_ok=True)
     records.to_csv(output_dir / "records.csv", index=False)
@@ -275,10 +406,11 @@ def write_gate_report(records: pd.DataFrame, output_dir: Path) -> Path:
             [str(permutation_path.relative_to(output_dir)), str(scatter_path.relative_to(output_dir))]
         )
 
-    profiles = sorted({str(value) for value in records.get("profile", pd.Series(dtype=str)).dropna()})
     manifest = {
         "gate_status": status,
+        "run_id": run_id,
         "profiles": profiles,
+        "frozen_protocol": protocol,
         "records": "records.csv",
         "plots": plot_paths,
         "representatives": representatives,
@@ -291,8 +423,16 @@ def write_gate_report(records: pd.DataFrame, output_dir: Path) -> Path:
     memo_lines = [
         "# Gate 0 evidence memo",
         "",
+        f"Run ID: {run_id}",
         f"Overall status: **{status}**",
         f"Selected profile: {', '.join(profiles) if profiles else 'unknown'}",
+        "",
+        (
+            "Estimand: Residual dependence remaining after adjustment for the other observed "
+            "variables under the specified model."
+        ),
+        "",
+        *_protocol_memo_lines(protocol),
         "",
         "## Fixture classifications",
         "",
@@ -329,7 +469,7 @@ def write_gate_report(records: pd.DataFrame, output_dir: Path) -> Path:
                 "otherwise independent X1 and X2 residuals dependent."
             ),
             "",
-            _FINAL_OWNER_DECISION,
+            OWNER_DECISION_SENTENCE,
             "",
         ]
     )

@@ -3,6 +3,15 @@
 import hashlib
 from dataclasses import dataclass
 
+FIXTURE_COEFFICIENT = 0.7
+FIXTURE_NOISE_DISTRIBUTION = "independent standard Gaussian"
+FIXTURE_NOISE_MEAN = 0.0
+FIXTURE_NOISE_STANDARD_DEVIATION = 1.0
+OWNER_DECISION_SENTENCE = (
+    "Owner decision required; this result does not authorize estimator redesign, a new "
+    "simulation family, or package work."
+)
+
 
 @dataclass(frozen=True)
 class ComputationalProfile:
