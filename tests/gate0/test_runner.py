@@ -12,9 +12,13 @@ from research.gate0.runner import PairRecord, SmokeMeasurement, run_gate0, selec
 
 def test_profile_selection_uses_only_the_two_predeclared_profiles() -> None:
     assert select_profile(SmokeMeasurement(projected_seconds=14_000, peak_gib=3.0)) == FULL_PROFILE
-    assert select_profile(SmokeMeasurement(projected_seconds=14_500, peak_gib=3.0)) == REDUCED_PROFILE
+    assert select_profile(SmokeMeasurement(projected_seconds=14_500, peak_gib=0.9)) == REDUCED_PROFILE
     assert select_profile(SmokeMeasurement(projected_seconds=14_500, peak_gib=4.1)) is None
     assert select_profile(SmokeMeasurement(projected_seconds=40_000, peak_gib=3.0)) is None
+
+
+def test_profile_selection_stops_when_reduced_memory_projection_exceeds_limit() -> None:
+    assert select_profile(SmokeMeasurement(projected_seconds=14_500, peak_gib=1.1)) is None
 
 
 def test_substantive_run_requires_a_smoke_selected_profile(tmp_path) -> None:

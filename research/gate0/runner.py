@@ -71,7 +71,13 @@ def select_profile(smoke: SmokeMeasurement) -> ComputationalProfile | None:
     reduced_projected_seconds = smoke.projected_seconds * (
         _profile_work(REDUCED_PROFILE) / _profile_work(FULL_PROFILE)
     )
-    if reduced_projected_seconds <= _MAX_PROJECTED_SECONDS:
+    reduced_projected_peak_gib = smoke.peak_gib * (
+        REDUCED_PROFILE.source_rows / SMOKE_PROFILE.source_rows
+    )
+    if (
+        reduced_projected_seconds <= _MAX_PROJECTED_SECONDS
+        and reduced_projected_peak_gib <= _MAX_PYTHON_ALLOCATION_GIB
+    ):
         return REDUCED_PROFILE
     return None
 
