@@ -14,6 +14,7 @@ from research.gate0.batch_null_report import (
     write_confirmation_report,
 )
 from research.gate0.config import OWNER_DECISION_SENTENCE
+from scripts import run_batch_null_confirmation as confirmation_cli
 
 
 @pytest.fixture(autouse=True)
@@ -134,6 +135,31 @@ def test_confirmation_report_rejects_changed_calibration_records(tmp_path: Path)
             calibration,
             BatchNullConfig(),
         )
+
+
+def test_confirmation_cli_rejects_tampered_calibration_before_creating_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The CLI must refuse altered calibration records before opening its output directory."""
+
+    calibration = _ready_calibration(tmp_path / "calibration")
+    (calibration / "records.csv").write_text("tampered", encoding="utf-8")
+    output = tmp_path / "confirmation"
+    monkeypatch.setattr(confirmation_cli, "_CALIBRATION_ARTIFACT_ROOT", tmp_path)
+
+    result = confirmation_cli.main(
+        [
+            "--calibration-dir",
+            str(calibration),
+            "--output-dir",
+            str(output),
+            "--run-id",
+            "batch-confirmation-unit",
+        ]
+    )
+
+    assert result != 0
+    assert not output.exists()
 
 
 def test_confirmation_report_copies_pinned_calibration_selection(tmp_path: Path) -> None:
