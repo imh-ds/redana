@@ -145,7 +145,7 @@ def _runner_provenance(
     except json.JSONDecodeError as error:
         raise ValueError("report requires valid manifest-input.json") from error
     if not isinstance(runner_input, dict):
-        raise ValueError("report requires object manifest-input.json")
+        raise TypeError("report requires object manifest-input.json")
     return {
         "configuration": runner_input.get("config", asdict(config)),
         "seed_namespace": runner_input.get("seed_namespace", f"batch-null-{phase}"),
@@ -167,7 +167,7 @@ def _verified_calibration(calibration_dir: Path) -> dict[str, object]:
     except json.JSONDecodeError as error:
         raise ValueError("calibration manifest is not valid JSON with SHA-256 evidence") from error
     if not isinstance(manifest, dict):
-        raise ValueError("calibration manifest lacks SHA-256 evidence")
+        raise TypeError("calibration manifest lacks SHA-256 evidence")
     expected_records_hash = _nested_text(manifest, "records", "sha256")
     expected_input_hash = _nested_text(manifest, "manifest_input", "sha256")
     if not expected_records_hash or not expected_input_hash:

@@ -228,6 +228,35 @@ def test_report_requires_matching_record_run_id(tmp_path: Path) -> None:
         write_calibration_report(records, tmp_path, "argument", BatchNullConfig())
 
 
+def test_calibration_report_rejects_non_object_runner_input(tmp_path: Path) -> None:
+    """A JSON list is the wrong input type for the runner provenance object."""
+
+    records = _records(phase="calibration", run_id="calibration-unit")
+    _write_runner_inputs(tmp_path, records)
+    (tmp_path / "manifest-input.json").write_text("[]", encoding="utf-8")
+
+    with pytest.raises(TypeError, match="object manifest-input"):
+        write_calibration_report(records, tmp_path, "calibration-unit", BatchNullConfig())
+
+
+def test_confirmation_report_rejects_non_object_calibration_manifest(tmp_path: Path) -> None:
+    """A JSON list is the wrong type for a calibration evidence manifest."""
+
+    calibration = _ready_calibration(tmp_path / "calibration")
+    (calibration / "manifest.json").write_text("[]", encoding="utf-8")
+    confirmation = _records(phase="confirmation", run_id="confirmation-unit")
+    _write_runner_inputs(tmp_path / "confirmation", confirmation)
+
+    with pytest.raises(TypeError, match="manifest lacks SHA-256"):
+        write_confirmation_report(
+            confirmation,
+            tmp_path / "confirmation",
+            "confirmation-unit",
+            calibration,
+            BatchNullConfig(),
+        )
+
+
 def test_memos_end_with_owner_governance_sentence(tmp_path: Path) -> None:
     """Evidence reports must not authorize F1--F8 or automatic successor work."""
 
