@@ -9,6 +9,7 @@ import pytest
 from research.gate0 import batch_null_runner
 from research.gate0.batch_null_policy import BatchNullConfig
 from research.gate0.batch_null_runner import run_batch_phase
+from scripts import run_batch_null_calibration as calibration_cli
 
 
 def _small_config() -> BatchNullConfig:
@@ -112,3 +113,40 @@ def test_runner_persists_records_and_manifest_after_all_attempts(tmp_path: Path)
     assert manifest["phase"] == "confirmation"
     assert manifest["seed_namespace"] == "batch-null-confirmation"
     assert manifest["run_id"] == "manifest"
+
+
+def test_calibration_cli_refuses_completed_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "calibration"
+    received: list[BatchNullConfig] = []
+
+    def fake_run(
+        phase: str, output_dir: Path, run_id: str, config: BatchNullConfig
+    ) -> pd.DataFrame:
+        assert phase == "calibration"
+        output_dir.mkdir(parents=True)
+        (output_dir / "records.csv").write_text("run_id\n" + run_id + "\n", encoding="utf-8")
+        (output_dir / "manifest-input.json").write_text("{}\n", encoding="utf-8")
+        received.append(config)
+        return pd.DataFrame({"run_id": [run_id], "phase": [phase]})
+
+    def fake_report(
+        _records: pd.DataFrame, output_dir: Path, _run_id: str, _config: BatchNullConfig
+    ) -> Path:
+        memo = output_dir / "calibration-memo.md"
+        memo.write_text("calibration evidence\n", encoding="utf-8")
+        (output_dir / "manifest.json").write_text(
+            '{"terminal_outcome": "READY"}\n', encoding="utf-8"
+        )
+        return memo
+
+    monkeypatch.setattr(calibration_cli, "run_batch_phase", fake_run)
+    monkeypatch.setattr(calibration_cli, "write_calibration_report", fake_report)
+
+    first = calibration_cli.main(["--output-dir", str(output), "--run-id", "batch-calibration-unit"])
+    second = calibration_cli.main(["--output-dir", str(output), "--run-id", "batch-calibration-unit"])
+
+    assert first == 0
+    assert second != 0
+    assert received == [BatchNullConfig()]
