@@ -1,3 +1,4 @@
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -46,6 +47,52 @@ def test_confirmation_uses_a_new_seed_namespace(tmp_path: Path) -> None:
     frame = run_confirmation(tmp_path, "seeds", ConfirmationPolicy.frozen(), _small_config())
 
     assert frame["seed_namespace"].eq("reference-confirmation").all()
+
+
+def test_confirmation_config_defaults_match_production_confirmation_matrix() -> None:
+    config = ConfirmationConfig()
+
+    assert config.reference_replications == 30
+    assert config.fixture_replications == 10
+    assert config.source_rows == 50_000
+    assert config.evaluation_rows == 1_000
+    assert config.permutations == 199
+
+
+def test_confirmation_manifest_records_calibration_and_run_provenance(tmp_path: Path) -> None:
+    run_id = "manifest-provenance"
+    policy = ConfirmationPolicy.frozen()
+    config = _small_config()
+
+    run_confirmation(tmp_path, run_id, policy, config)
+    manifest = json.loads((tmp_path / "manifest-input.json").read_text(encoding="utf-8"))
+
+    assert manifest["calibration_source"] == confirmation_runner.CALIBRATION_SOURCE
+    assert manifest["calibration_sha256"] == policy.calibration_sha256
+    assert manifest["matrix_counts"] == {"reference": 1, "fixture": 16}
+    assert manifest["seed_namespace"] == "reference-confirmation"
+    assert manifest["run_id"] == run_id
+    assert manifest["source_revision"] == confirmation_runner._source_revision()
+
+
+def test_reference_cell_isolated_from_fixture_generation_and_residualization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail_fixture(*args: object, **kwargs: object) -> object:
+        raise AssertionError("reference execution must not generate fixtures")
+
+    def fail_residuals(*args: object, **kwargs: object) -> object:
+        raise AssertionError("reference execution must not residualize fixtures")
+
+    monkeypatch.setattr(confirmation_runner, "generate_fixture", fail_fixture)
+    monkeypatch.setattr(confirmation_runner, "cross_fitted_pair_residuals", fail_residuals)
+
+    record = confirmation_runner._run_reference_cell(tmp_path, 0, _small_config())
+
+    assert record.exception_text is None
+    assert record.observed_statistic is not None
+    assert record.permutation_p_value is not None
+    assert record.null_statistics_path == "reference/null_statistics/replication-0.npy"
 
 
 def test_confirmation_retains_reference_arrays_and_fixture_samples(tmp_path: Path) -> None:
