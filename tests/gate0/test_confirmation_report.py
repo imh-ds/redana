@@ -99,7 +99,7 @@ def test_confirmation_memo_records_frozen_boundary_and_governance(tmp_path: Path
 
 
 def test_reference_p_value_failure_is_stop(tmp_path: Path) -> None:
-    records = _passing_records(tmp_path)
+    records = _passing_records(tmp_path, "stop")
     records.loc[records.component == "reference", "permutation_p_value"] = 0.05
 
     memo = write_confirmation_report(records, tmp_path, "stop", ConfirmationPolicy.frozen())
@@ -108,7 +108,7 @@ def test_reference_p_value_failure_is_stop(tmp_path: Path) -> None:
 
 
 def test_reference_count_failure_is_narrow(tmp_path: Path) -> None:
-    records = _passing_records(tmp_path)
+    records = _passing_records(tmp_path, "narrow")
     records.loc[records.component == "reference", "observed_statistic"] = 0.2
 
     memo = write_confirmation_report(records, tmp_path, "narrow", ConfirmationPolicy.frozen())
@@ -117,7 +117,9 @@ def test_reference_count_failure_is_narrow(tmp_path: Path) -> None:
 
 
 def test_report_writes_summary_manifest_and_reference_plot(tmp_path: Path) -> None:
-    write_confirmation_report(_passing_records(tmp_path), tmp_path, "artifacts", ConfirmationPolicy.frozen())
+    write_confirmation_report(
+        _passing_records(tmp_path, "artifacts"), tmp_path, "artifacts", ConfirmationPolicy.frozen()
+    )
 
     assert (tmp_path / "confirmation-summary.csv").exists()
     assert (tmp_path / "manifest.json").exists()
@@ -125,11 +127,14 @@ def test_report_writes_summary_manifest_and_reference_plot(tmp_path: Path) -> No
     manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["terminal_outcome"] == "PASS"
     assert manifest["calibration"]["quantile_interpolation"] == "linear"
+    assert manifest["reference_check"]["reference_replications"] == 30
+    assert manifest["reference_check"]["minimum_below_boundary"] == 27
+    assert manifest["reference_check"]["maximum_low_p_values"] == 4
     assert (tmp_path / "run_state.json").read_text(encoding="utf-8").find("complete") >= 0
 
 
 def test_definite_fixture_mismatch_requires_owner_decision(tmp_path: Path) -> None:
-    records = _passing_records(tmp_path)
+    records = _passing_records(tmp_path, "mixed")
     target = (records.fixture_id == "F1") & (records.pair_role == "target")
     records.loc[target, "observed_statistic"] = 0.12
     records.loc[target, "permutation_p_value"] = 0.01
@@ -140,7 +145,7 @@ def test_definite_fixture_mismatch_requires_owner_decision(tmp_path: Path) -> No
 
 
 def test_ambiguous_fixture_is_narrow(tmp_path: Path) -> None:
-    records = _passing_records(tmp_path)
+    records = _passing_records(tmp_path, "ambiguous")
     target = (records.fixture_id == "F1") & (records.pair_role == "target")
     records.loc[target, "observed_statistic"] = 0.08
     records.loc[target, "permutation_p_value"] = 0.50
@@ -151,7 +156,7 @@ def test_ambiguous_fixture_is_narrow(tmp_path: Path) -> None:
 
 
 def test_malformed_records_are_stop(tmp_path: Path) -> None:
-    records = _passing_records(tmp_path)
+    records = _passing_records(tmp_path, "malformed")
     records.loc[records.component == "reference", "observed_statistic"] = None
 
     memo = write_confirmation_report(records, tmp_path, "malformed", ConfirmationPolicy.frozen())
@@ -165,4 +170,26 @@ def test_mixed_run_ids_are_rejected(tmp_path: Path) -> None:
     records.loc[0, "run_id"] = "other"
 
     with pytest.raises(ValueError, match="mixed run IDs"):
+        write_confirmation_report(records, tmp_path, "unit", ConfirmationPolicy.frozen())
+
+
+def test_record_run_id_mismatch_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="does not match"):
+        write_confirmation_report(
+            _passing_records(tmp_path, "records"), tmp_path, "argument", ConfirmationPolicy.frozen()
+        )
+
+
+def test_missing_record_run_id_is_rejected(tmp_path: Path) -> None:
+    records = _passing_records(tmp_path).drop(columns="run_id")
+
+    with pytest.raises(ValueError, match="requires record run_id"):
+        write_confirmation_report(records, tmp_path, "unit", ConfirmationPolicy.frozen())
+
+
+def test_null_record_run_id_is_rejected(tmp_path: Path) -> None:
+    records = _passing_records(tmp_path)
+    records.loc[0, "run_id"] = None
+
+    with pytest.raises(ValueError, match="requires record run_id"):
         write_confirmation_report(records, tmp_path, "unit", ConfirmationPolicy.frozen())

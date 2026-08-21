@@ -56,7 +56,7 @@ def write_confirmation_report(
 ) -> Path:
     """Write final report artifacts using the frozen policy without altering its outcome."""
 
-    _reject_mixed_run_ids(records)
+    _validate_record_run_id(records, run_id)
     output_dir.mkdir(parents=True, exist_ok=True)
     reference_records = _component_records(records, "reference")
     fixture_records = _component_records(records, "fixture")
@@ -81,12 +81,16 @@ def write_confirmation_report(
     return memo_path
 
 
-def _reject_mixed_run_ids(records: pd.DataFrame) -> None:
+def _validate_record_run_id(records: pd.DataFrame, run_id: str) -> None:
     if "run_id" not in records:
-        return
+        raise ValueError("confirmation report requires record run_id")
+    if records["run_id"].isna().any():
+        raise ValueError("confirmation report requires record run_id")
     run_ids = {str(value) for value in records["run_id"].dropna().unique()}
     if len(run_ids) > 1:
         raise ValueError("confirmation report rejects mixed run IDs")
+    if len(run_ids) != 1 or run_ids.pop() != run_id:
+        raise ValueError("confirmation record run ID does not match report run_id")
 
 
 def _component_records(records: pd.DataFrame, component: str) -> pd.DataFrame:
@@ -260,7 +264,12 @@ def _manifest(
             "quantile_interpolation": policy.quantile_interpolation,
             "practical_null_boundary": policy.practical_null_boundary,
         },
-        "reference_check": asdict(reference),
+        "reference_check": {
+            "reference_replications": policy.reference_replications,
+            "minimum_below_boundary": 27,
+            "maximum_low_p_values": 4,
+            **asdict(reference),
+        },
         "fixture_rule": {
             "null_like": "median dCor < boundary and at most 2 p-values <= 0.05",
             "non_null": "median dCor >= 0.10 and at least 8 p-values <= 0.01",
