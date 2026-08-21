@@ -1,0 +1,17 @@
+{
+  "attempted_records": 1000,
+  "config": {
+    "batches": 100,
+    "evaluation_rows": 1000,
+    "maximum_batch_low_p_values": 2,
+    "maximum_confirmation_low_p_values": 67,
+    "minimum_calibration_guard_batches": 90,
+    "minimum_confirmation_null_like_batches": 85,
+    "permutations": 199,
+    "replications_per_batch": 10
+  },
+  "phase": "confirmation",
+  "run_id": "batch-null-confirmation-20260821-001",
+  "seed_namespace": "batch-null-confirmation",
+  "source_revision": "7861cdb80615d7ca0cd2e91af332e2f581334076"
+}
