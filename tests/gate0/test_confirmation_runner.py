@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -6,6 +8,18 @@ import pytest
 from research.gate0 import confirmation_runner
 from research.gate0.confirmation_policy import ConfirmationPolicy
 from research.gate0.confirmation_runner import ConfirmationConfig, run_confirmation
+
+
+def run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
+    """Invoke the reference-confirmation command at its public boundary."""
+
+    return subprocess.run(
+        [sys.executable, "scripts/run_reference_confirmation.py", *arguments],
+        capture_output=True,
+        check=False,
+        cwd=Path(__file__).resolve().parents[2],
+        text=True,
+    )
 
 
 def _small_config() -> ConfirmationConfig:
@@ -53,6 +67,17 @@ def test_confirmation_refuses_nonempty_output(tmp_path: Path) -> None:
 
     with pytest.raises(FileExistsError, match="initialized"):
         run_confirmation(output, "taken", ConfirmationPolicy.frozen(), _small_config())
+
+
+def test_confirmation_cli_refuses_completed_run(tmp_path: Path) -> None:
+    """A completed immutable run directory cannot be executed a second time."""
+
+    output = tmp_path / "confirmation"
+    first = run_cli("--output-dir", str(output), "--run-id", "confirmation-unit")
+    second = run_cli("--output-dir", str(output), "--run-id", "confirmation-unit")
+
+    assert first.returncode == 0
+    assert second.returncode != 0
 
 
 def test_confirmation_retains_fixture_cell_exception_and_continues(
