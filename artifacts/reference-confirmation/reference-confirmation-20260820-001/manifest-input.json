@@ -1,0 +1,26 @@
+{
+  "calibration_sha256": "57160bf69892c4047e8a089487d5b894d09243c1a3bcf60164f4daa881369197",
+  "calibration_source": "artifacts/null-calibration/null-calibration-20260820-001/records.csv",
+  "config": {
+    "evaluation_rows": 1000,
+    "fixture_replications": 10,
+    "permutations": 199,
+    "reference_replications": 30,
+    "source_rows": 50000
+  },
+  "matrix_counts": {
+    "fixture": 160,
+    "reference": 30
+  },
+  "policy": {
+    "calibration_quantile": 0.95,
+    "calibration_sha256": "57160bf69892c4047e8a089487d5b894d09243c1a3bcf60164f4daa881369197",
+    "fixture_replications": 10,
+    "practical_null_boundary": 0.07078970914915612,
+    "quantile_interpolation": "linear",
+    "reference_replications": 30
+  },
+  "run_id": "reference-confirmation-20260820-001",
+  "seed_namespace": "reference-confirmation",
+  "source_revision": "67415f1dc983630c2735b52cc041485172cf0b0d"
+}
