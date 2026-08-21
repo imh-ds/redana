@@ -1,0 +1,17 @@
+{
+  "attempted_records": 1000,
+  "config": {
+    "batches": 100,
+    "evaluation_rows": 1000,
+    "maximum_batch_low_p_values": 2,
+    "maximum_confirmation_low_p_values": 67,
+    "minimum_calibration_guard_batches": 90,
+    "minimum_confirmation_null_like_batches": 85,
+    "permutations": 199,
+    "replications_per_batch": 10
+  },
+  "phase": "calibration",
+  "run_id": "batch-null-calibration-20260821-001",
+  "seed_namespace": "batch-null-calibration",
+  "source_revision": "440b19b6a641eba2a7a98d9c0704fb7c818873e5"
+}
