@@ -191,6 +191,44 @@ def test_retained_fixture_exception_is_stop() -> None:
     )
 
 
+def test_fixture_exception_outranks_reference_boundary_failure() -> None:
+    reference_records = pd.DataFrame(
+        {
+            "observed_statistic": [0.01] * 26 + [0.2] * 4,
+            "permutation_p_value": [0.5] * 30,
+        }
+    )
+    fixture_records = _passing_fixture_records()
+    fixture_records.loc[0, "exception_text"] = "RuntimeError: retained failure"
+
+    assert (
+        confirmation_status(
+            check_reference(reference_records, ConfirmationPolicy.frozen()),
+            fixture_records,
+            ConfirmationPolicy.frozen(),
+        )
+        == "STOP"
+    )
+
+
+def test_retained_reference_exception_makes_reference_incomplete() -> None:
+    records = pd.DataFrame(
+        {
+            "observed_statistic": [0.01] * 30,
+            "permutation_p_value": [0.5] * 30,
+            "exception_text": [None] * 29 + ["RuntimeError: retained failure"],
+        }
+    )
+
+    check = check_reference(records, ConfirmationPolicy.frozen())
+
+    assert not check.complete
+    assert (
+        confirmation_status(check, _passing_fixture_records(), ConfirmationPolicy.frozen())
+        == "STOP"
+    )
+
+
 def test_ambiguity_outranks_a_mismatch_that_comes_first() -> None:
     fixture_records = _passing_fixture_records()
     fixture_records.loc[

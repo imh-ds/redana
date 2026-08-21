@@ -91,7 +91,12 @@ def check_reference(records: pd.DataFrame, policy: ConfirmationPolicy) -> Refere
 
     statistics = _numeric_column(records, "observed_statistic")
     p_values = _numeric_column(records, "permutation_p_value")
-    if len(records) != policy.reference_replications or statistics is None or p_values is None:
+    if (
+        len(records) != policy.reference_replications
+        or statistics is None
+        or p_values is None
+        or _has_retained_exception(records)
+    ):
         return ReferenceCheck(False, 0, 0, False, False)
 
     below_boundary_count = int((statistics < policy.practical_null_boundary).sum())
@@ -112,8 +117,6 @@ def confirmation_status(
 
     if not reference.complete or not reference.p_value_passed:
         return "STOP"
-    if not reference.practical_boundary_passed:
-        return "NARROW"
     if _has_retained_exception(fixture_records):
         return "STOP"
 
@@ -144,7 +147,7 @@ def confirmation_status(
             return "STOP"
         has_ambiguity |= observed_class == "ambiguous"
         has_mismatch |= observed_class != "ambiguous" and observed_class != expected_class
-    if has_ambiguity:
+    if not reference.practical_boundary_passed or has_ambiguity:
         return "NARROW"
     if has_mismatch:
         return "MIXED / OWNER DECISION"
