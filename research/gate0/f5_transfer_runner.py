@@ -18,6 +18,7 @@ from research.gate0.metrics import permutation_distance_correlation
 from research.gate0.residuals import cross_fitted_pair_residuals
 
 _NAMESPACE = "batch-f5-null-transfer"
+_PHASE = "f5-null-transfer"
 _SEED_COLUMNS = ("fixture_seed", "residual_seed", "permutation_seed")
 
 
@@ -53,6 +54,7 @@ class F5TransferRecord:
     fixture_id: str
     left: str
     right: str
+    phase: str
     batch: int
     replication: int
     observed_statistic: float | None
@@ -92,6 +94,7 @@ def run_f5_transfer(
             "config": asdict(config),
             "fixture_id": "F5",
             "pair": ["X1", "X2"],
+            "phase": _PHASE,
             "run_id": run_id,
             "seed_namespace": _NAMESPACE,
             "source_revision": _source_revision(),
@@ -185,6 +188,7 @@ def _record(
         fixture_id="F5",
         left="X1",
         right="X2",
+        phase=_PHASE,
         batch=batch,
         replication=replication,
         observed_statistic=observed_statistic,

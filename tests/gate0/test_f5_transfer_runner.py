@@ -36,6 +36,7 @@ def test_runner_generates_only_f5_and_retains_every_successful_cell(
         (batch, replication) for batch in range(2) for replication in range(3)
     }
     assert frame["seed_namespace"].eq("batch-f5-null-transfer").all()
+    assert frame["phase"].eq("f5-null-transfer").all()
     assert frame["exception_text"].isna().all()
     for relative_path in frame["residual_samples_path"]:
         assert len(pd.read_csv(tmp_path / relative_path)) == 100
