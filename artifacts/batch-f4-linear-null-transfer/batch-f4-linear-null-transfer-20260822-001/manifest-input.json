@@ -1,0 +1,22 @@
+{
+  "attempted_records": 1000,
+  "config": {
+    "batches": 100,
+    "n_splits": 5,
+    "permutations": 199,
+    "replications_per_batch": 10,
+    "ridge_alpha": 1.0,
+    "rows": 1000,
+    "spline_degree": 3,
+    "spline_knots": 5
+  },
+  "fixture_id": "F4",
+  "pair": [
+    "X1",
+    "X3"
+  ],
+  "phase": "f4-linear-null-transfer",
+  "run_id": "batch-f4-linear-null-transfer-20260822-001",
+  "seed_namespace": "batch-f4-linear-null-transfer",
+  "source_revision": "e16c5cc9a9fc8fa9a6b971d1e9591f5ff66792cc"
+}
