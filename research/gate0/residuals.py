@@ -37,6 +37,27 @@ def _adjustment_pipeline(config: Gate0Config) -> Pipeline:
     )
 
 
+def quadratic_adjustment_features(design: pd.DataFrame) -> pd.DataFrame:
+    """Return each adjustment variable followed immediately by its square."""
+
+    features: dict[str, pd.Series] = {}
+    for name in design.columns:
+        features[name] = design[name]
+        features[f"{name}_squared"] = design[name] ** 2
+    return pd.DataFrame(features, index=design.index)
+
+
+def _quadratic_adjustment_pipeline(config: Gate0Config) -> Pipeline:
+    """Build the scaling and ridge pipeline for quadratic adjustment features."""
+
+    return Pipeline(
+        [
+            ("scale", StandardScaler()),
+            ("ridge", Ridge(alpha=config.ridge_alpha)),
+        ]
+    )
+
+
 def cross_fitted_pair_residuals(
     frame: pd.DataFrame, left: str, right: str, config: Gate0Config, seed: int
 ) -> pd.DataFrame:
@@ -51,6 +72,29 @@ def cross_fitted_pair_residuals(
         observed = frame[endpoint]
         for train_rows, test_rows in splitter.split(design):
             model = _adjustment_pipeline(config)
+            model.fit(design.iloc[train_rows], observed.iloc[train_rows])
+            held_out_prediction = model.predict(design.iloc[test_rows])
+            residuals.iloc[test_rows, residuals.columns.get_loc(endpoint)] = (
+                observed.iloc[test_rows] - held_out_prediction
+            ).to_numpy()
+
+    return residuals
+
+
+def cross_fitted_pair_quadratic_residuals(
+    frame: pd.DataFrame, left: str, right: str, config: Gate0Config, seed: int
+) -> pd.DataFrame:
+    """Return held-out residuals after pair-specific quadratic adjustment."""
+
+    predictors = predictor_columns(frame.columns, left, right)
+    design = quadratic_adjustment_features(frame.loc[:, predictors])
+    splitter = KFold(n_splits=config.n_splits, shuffle=True, random_state=seed)
+    residuals = pd.DataFrame(index=frame.index, columns=[left, right], dtype=float)
+
+    for endpoint in (left, right):
+        observed = frame[endpoint]
+        for train_rows, test_rows in splitter.split(design):
+            model = _quadratic_adjustment_pipeline(config)
             model.fit(design.iloc[train_rows], observed.iloc[train_rows])
             held_out_prediction = model.predict(design.iloc[test_rows])
             residuals.iloc[test_rows, residuals.columns.get_loc(endpoint)] = (
