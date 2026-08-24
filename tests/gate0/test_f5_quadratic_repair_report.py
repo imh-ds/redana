@@ -269,6 +269,26 @@ def test_retained_exception_stops_without_requiring_missing_cell_files(
     assert "Terminal outcome: **STOP**" in memo.read_text(encoding="utf-8")
 
 
+def test_nondefault_direct_report_config_is_refused_before_report_output(
+    tmp_path: Path,
+) -> None:
+    """A direct caller cannot shrink dimensions before policy evaluation."""
+
+    output = tmp_path / "repair"
+
+    with pytest.raises(ValueError, match="frozen F5 quadratic repair configuration"):
+        write_f5_quadratic_repair_report(
+            pd.DataFrame(),
+            output,
+            _RUN_ID,
+            tmp_path / "calibration",
+            tmp_path / "f5-stop",
+            F5QuadraticRepairConfig(batches=85),
+        )
+
+    assert not (output / "manifest.json").exists()
+
+
 @pytest.mark.parametrize(
     ("column", "value", "message"),
     [

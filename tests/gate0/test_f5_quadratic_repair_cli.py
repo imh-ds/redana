@@ -100,6 +100,50 @@ def test_cli_uses_frozen_defaults_and_refuses_reused_output(
     assert "F5 QUADRATIC REPAIR REFUSED [unit]" in streams.err
 
 
+def test_main_returns_single_line_refusal_for_unknown_configuration_flag(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """An unknown study flag must not escape main as argparse usage/SystemExit."""
+
+    from scripts import run_f5_quadratic_repair as cli
+
+    result = cli.main(
+        [
+            "--output-dir",
+            str(tmp_path / "official"),
+            "--run-id",
+            "unit",
+            "--rows",
+            "changed",
+        ]
+    )
+
+    streams = capsys.readouterr()
+    assert result == 2
+    assert streams.out == ""
+    assert streams.err == (
+        "F5 QUADRATIC REPAIR REFUSED [unit]: unrecognized arguments: --rows changed\n"
+    )
+
+
+def test_main_returns_single_line_refusal_for_missing_required_argument(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A missing required option must return 2 without argparse usage output."""
+
+    from scripts import run_f5_quadratic_repair as cli
+
+    result = cli.main(["--output-dir", str(tmp_path / "official")])
+
+    streams = capsys.readouterr()
+    assert result == 2
+    assert streams.out == ""
+    assert streams.err == (
+        "F5 QUADRATIC REPAIR REFUSED [<missing>]: the following arguments are required: "
+        "--run-id\n"
+    )
+
+
 @pytest.mark.parametrize(
     "forbidden",
     [

@@ -72,6 +72,8 @@ def write_f5_quadratic_repair_report(
 ) -> Path:
     """Write repair evidence against the exact calibration and F5 STOP parents."""
 
+    if config != F5QuadraticRepairConfig():
+        raise ValueError("F5 report requires the frozen F5 quadratic repair configuration")
     _validate_records(records, output_dir, run_id, config)
     calibration = _verified_frozen_calibration(calibration_dir)
     f5_stop = _verified_f5_stop(f5_stop_dir)
