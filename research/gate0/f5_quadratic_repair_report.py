@@ -259,9 +259,16 @@ def _read_null_array(path: Path, permutations: int) -> np.ndarray:
     if not path.is_file():
         raise ValueError(f"F5 quadratic repair requires retained null array: {path.name}")
     try:
-        values = np.asarray(np.load(path, allow_pickle=False), dtype=float)
+        raw_values = np.load(path, allow_pickle=False)
     except (OSError, TypeError, ValueError) as error:
         raise ValueError("F5 quadratic null array is not a valid numeric NPY") from error
+    if (
+        not isinstance(raw_values, np.ndarray)
+        or not np.issubdtype(raw_values.dtype, np.number)
+        or np.issubdtype(raw_values.dtype, np.complexfloating)
+    ):
+        raise ValueError("F5 quadratic null array must be a real numeric ndarray")
+    values = raw_values.astype(float, copy=False)
     if values.shape != (permutations,):
         raise ValueError("F5 quadratic null array has the wrong permutation count")
     if not np.isfinite(values).all():

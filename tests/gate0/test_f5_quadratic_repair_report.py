@@ -547,6 +547,31 @@ def test_corrupt_null_array_is_refused(
     assert not (output / "manifest.json").exists()
 
 
+def test_complex_null_array_is_refused_before_report_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Imaginary components cannot be discarded during evidence validation."""
+
+    records = _records()
+    output, calibration, f5_stop = _prepared_report(tmp_path, monkeypatch, records)
+    null_path = output / records.loc[0, "null_statistics_path"]
+    expected = np.load(null_path)
+    np.save(null_path, expected.astype(complex) + 1j)
+
+    with pytest.raises(ValueError, match="real numeric ndarray"):
+        write_f5_quadratic_repair_report(
+            records,
+            output,
+            _RUN_ID,
+            calibration,
+            f5_stop,
+            F5QuadraticRepairConfig(),
+        )
+
+    assert not (output / "manifest.json").exists()
+
+
 @pytest.mark.parametrize(
     ("column", "value", "message"),
     [
