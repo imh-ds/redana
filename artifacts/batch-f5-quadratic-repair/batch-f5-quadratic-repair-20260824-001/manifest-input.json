@@ -1,0 +1,22 @@
+{
+  "attempted_records": 1000,
+  "basis": "raw-plus-square",
+  "config": {
+    "batches": 100,
+    "n_splits": 5,
+    "permutations": 199,
+    "replications_per_batch": 10,
+    "ridge_alpha": 1.0,
+    "rows": 1000
+  },
+  "fixture_id": "F5",
+  "pair": [
+    "X1",
+    "X2"
+  ],
+  "phase": "f5-quadratic-repair",
+  "run_id": "batch-f5-quadratic-repair-20260824-001",
+  "seed_namespace": "batch-f5-quadratic-repair",
+  "source_revision": "48217ca03ce7c63e632c6449bdc175a323245f9b",
+  "uses_splines": false
+}
