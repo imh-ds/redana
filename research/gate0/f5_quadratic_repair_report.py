@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 from dataclasses import asdict
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from research.gate0.batch_null_policy import (
@@ -18,14 +20,17 @@ from research.gate0.batch_null_policy import (
     summarize_batches,
 )
 from research.gate0.batch_null_report import _verified_calibration
-from research.gate0.config import OWNER_DECISION_SENTENCE
+from research.gate0.config import OWNER_DECISION_SENTENCE, derive_seed
 from research.gate0.f5_quadratic_repair_runner import F5QuadraticRepairConfig
+from research.gate0.metrics import permutation_distance_correlation
 
 _BOUNDARY = 0.058242447845091264
 _PHASE = "f5-quadratic-repair"
 _FIXTURE = "F5"
 _PAIR = ("X1", "X2")
 _NAMESPACE = "batch-f5-quadratic-repair"
+_REPRODUCTION_RTOL = 2e-12
+_REPRODUCTION_ATOL = 1e-14
 _CALIBRATION_HASHES = {
     "records_sha256": "267af397026e59c7169b393b648ed8bf1023f2f6a6f9f8ed18de55aa0589e7a5",
     "manifest_input_sha256": (
@@ -74,15 +79,18 @@ def write_f5_quadratic_repair_report(
 
     if config != F5QuadraticRepairConfig():
         raise ValueError("F5 report requires the frozen F5 quadratic repair configuration")
-    _validate_records(records, output_dir, run_id, config)
+    provenance, canonical_records = _runner_provenance(
+        output_dir, records, run_id, config
+    )
+    _validate_records(canonical_records, run_id, config)
     calibration = _verified_frozen_calibration(calibration_dir)
     f5_stop = _verified_f5_stop(f5_stop_dir)
-    provenance = _runner_provenance(output_dir, records, config)
+    _validate_retained_cells(canonical_records, output_dir, config)
     policy = _batch_policy(config)
-    batches = summarize_batches(records, policy)
-    confirmation = check_confirmation(batches, records, _BOUNDARY, policy)
+    batches = summarize_batches(canonical_records, policy)
+    confirmation = check_confirmation(batches, canonical_records, _BOUNDARY, policy)
     terminal_outcome = batch_terminal_status(None, confirmation)
-    summary = _batch_summary(records, batches, _BOUNDARY)
+    summary = _batch_summary(canonical_records, batches, _BOUNDARY)
     _write_csv(output_dir / "f5-quadratic-repair-summary.csv", summary)
     _write_plot_atomic(
         summary, output_dir / "plots" / "f5-quadratic-batch-classifications.png"
@@ -97,7 +105,7 @@ def write_f5_quadratic_repair_report(
         "basis": {"name": "raw-plus-square", "uses_splines": False},
         "seed_namespace": _NAMESPACE,
         "source_revision": provenance["source_revision"],
-        "record_count": len(records),
+        "record_count": len(canonical_records),
         "records": {
             "relative_path": "records.csv",
             "sha256": provenance["records_sha256"],
@@ -127,7 +135,7 @@ def write_f5_quadratic_repair_report(
             confirmation,
             terminal_outcome,
             provenance,
-            records,
+            canonical_records,
         ),
     )
     _write_json(
@@ -139,7 +147,6 @@ def write_f5_quadratic_repair_report(
 
 def _validate_records(
     records: pd.DataFrame,
-    output_dir: Path,
     run_id: str,
     config: F5QuadraticRepairConfig,
 ) -> None:
@@ -165,20 +172,101 @@ def _validate_records(
     if len(records) != len(expected) or actual != expected:
         raise ValueError("F5 quadratic repair requires every frozen batch/replication identity")
     for row in records.itertuples(index=False):
+        for column, component in (
+            ("fixture_seed", "fixture"),
+            ("residual_seed", "residual"),
+            ("permutation_seed", "permutation"),
+        ):
+            expected_seed = derive_seed(
+                _NAMESPACE, int(row.batch), int(row.replication), component
+            )
+            if int(getattr(row, column)) != expected_seed:
+                raise ValueError(
+                    f"F5 quadratic repair {column} does not match its derived seed identity"
+                )
+
+
+def _validate_retained_cells(
+    records: pd.DataFrame,
+    output_dir: Path,
+    config: F5QuadraticRepairConfig,
+) -> None:
+    for row in records.itertuples(index=False):
         if isinstance(row.exception_text, str) and row.exception_text:
+            if not pd.isna(row.observed_statistic) or not pd.isna(row.permutation_p_value):
+                raise ValueError("F5 quadratic exception records cannot retain metric results")
             continue
-        _require_evidence_file(output_dir, row.residual_samples_path, "residual sample")
-        _require_evidence_file(output_dir, row.null_statistics_path, "null array")
+        residual_relative = (
+            f"residual_samples/batch-{row.batch}-replication-{row.replication}.csv"
+        )
+        null_relative = (
+            f"null_statistics/batch-{row.batch}-replication-{row.replication}.npy"
+        )
+        if row.residual_samples_path != residual_relative:
+            raise ValueError("F5 quadratic residual sample path is not canonical")
+        if row.null_statistics_path != null_relative:
+            raise ValueError("F5 quadratic null array path is not canonical")
+        residuals = _read_residual_sample(output_dir / residual_relative, config.rows)
+        null_statistics = _read_null_array(
+            output_dir / null_relative, config.permutations
+        )
+        try:
+            recomputed = permutation_distance_correlation(
+                residuals["X1"].to_numpy(),
+                residuals["X2"].to_numpy(),
+                config.permutations,
+                int(row.permutation_seed),
+            )
+        except Exception as error:  # noqa: BLE001 - convert retained corruption to refusal.
+            raise ValueError("F5 quadratic retained cell metric cannot be reproduced") from error
+        if not np.isclose(
+            float(row.observed_statistic),
+            recomputed.observed,
+            rtol=_REPRODUCTION_RTOL,
+            atol=_REPRODUCTION_ATOL,
+        ):
+            raise ValueError("F5 quadratic observed dCor does not match retained residuals")
+        if float(row.permutation_p_value) != recomputed.p_value:
+            raise ValueError("F5 quadratic empirical p-value does not match retained evidence")
+        if not np.allclose(
+            null_statistics,
+            recomputed.null_statistics,
+            rtol=_REPRODUCTION_RTOL,
+            atol=_REPRODUCTION_ATOL,
+        ):
+            raise ValueError("F5 quadratic null array does not match seeded recomputation")
 
 
-def _require_evidence_file(output_dir: Path, value: object, label: str) -> None:
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"F5 quadratic repair requires every retained {label}")
-    relative_path = Path(value)
-    if relative_path.is_absolute() or ".." in relative_path.parts:
-        raise ValueError(f"F5 quadratic repair requires an in-run {label}")
-    if not (output_dir / relative_path).is_file():
-        raise ValueError(f"F5 quadratic repair requires retained {label}: {value}")
+def _read_residual_sample(path: Path, rows: int) -> pd.DataFrame:
+    if not path.is_file():
+        raise ValueError(f"F5 quadratic repair requires retained residual sample: {path.name}")
+    try:
+        residuals = pd.read_csv(path)
+    except (OSError, UnicodeError, pd.errors.ParserError) as error:
+        raise ValueError("F5 quadratic residual sample is not a valid CSV") from error
+    if list(residuals.columns) != list(_PAIR) or residuals.shape != (rows, 2):
+        raise ValueError("F5 quadratic residual sample has the wrong columns or row count")
+    try:
+        values = residuals.to_numpy(dtype=float)
+    except (TypeError, ValueError) as error:
+        raise ValueError("F5 quadratic residual sample must be numeric") from error
+    if not np.isfinite(values).all():
+        raise ValueError("F5 quadratic residual sample must be finite")
+    return residuals
+
+
+def _read_null_array(path: Path, permutations: int) -> np.ndarray:
+    if not path.is_file():
+        raise ValueError(f"F5 quadratic repair requires retained null array: {path.name}")
+    try:
+        values = np.asarray(np.load(path, allow_pickle=False), dtype=float)
+    except (OSError, TypeError, ValueError) as error:
+        raise ValueError("F5 quadratic null array is not a valid numeric NPY") from error
+    if values.shape != (permutations,):
+        raise ValueError("F5 quadratic null array has the wrong permutation count")
+    if not np.isfinite(values).all():
+        raise ValueError("F5 quadratic null array must be finite")
+    return values
 
 
 def _verified_frozen_calibration(calibration_dir: Path) -> dict[str, object]:
@@ -251,12 +339,35 @@ def _verify_parent_hashes(
 def _runner_provenance(
     output_dir: Path,
     records: pd.DataFrame,
+    run_id: str,
     config: F5QuadraticRepairConfig,
-) -> dict[str, object]:
+) -> tuple[dict[str, object], pd.DataFrame]:
     records_path = output_dir / "records.csv"
     input_path = output_dir / "manifest-input.json"
     if not records_path.is_file() or not input_path.is_file():
         raise ValueError("F5 quadratic repair requires retained records.csv and manifest-input.json")
+    try:
+        canonical_records = pd.read_csv(
+            records_path,
+            dtype={
+                "fixture_seed": "UInt64",
+                "residual_seed": "UInt64",
+                "permutation_seed": "UInt64",
+            },
+        )
+    except (OSError, TypeError, ValueError, pd.errors.ParserError) as error:
+        raise ValueError("F5 quadratic repair requires valid canonical records.csv") from error
+    try:
+        pd.testing.assert_frame_equal(
+            records.reset_index(drop=True),
+            canonical_records,
+            check_dtype=False,
+            check_exact=True,
+        )
+    except AssertionError as error:
+        raise ValueError(
+            "supplied F5 records must exactly match retained records.csv"
+        ) from error
     try:
         payload = json.loads(input_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as error:
@@ -269,18 +380,37 @@ def _runner_provenance(
         "fixture_id": _FIXTURE,
         "pair": list(_PAIR),
         "phase": _PHASE,
-        "run_id": records["run_id"].iloc[0],
+        "run_id": run_id,
         "seed_namespace": _NAMESPACE,
+        "attempted_records": config.batches * config.replications_per_batch,
         "uses_splines": False,
     }
     if any(payload.get(key) != value for key, value in expected.items()):
         raise ValueError("F5 quadratic runner provenance does not match the frozen scenario")
+    source_revision = payload.get("source_revision")
+    if not isinstance(source_revision, str) or not re.fullmatch(
+        r"[0-9a-f]{40}", source_revision
+    ):
+        raise ValueError("F5 quadratic runner source revision must be a full commit SHA")
+    if not _is_commit(source_revision):
+        raise ValueError("F5 quadratic runner source revision is not a retained commit")
     return {
         "configuration": payload["config"],
-        "source_revision": payload.get("source_revision", _source_revision()),
+        "source_revision": source_revision,
         "records_sha256": _sha256(records_path),
         "manifest_input_sha256": _sha256(input_path),
-    }
+    }, canonical_records
+
+
+def _is_commit(revision: str) -> bool:
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{revision}^{{commit}}"],
+        cwd=Path(__file__).resolve().parents[2],
+        capture_output=True,
+        check=False,
+        text=True,
+    )
+    return result.returncode == 0
 
 
 def _batch_policy(config: F5QuadraticRepairConfig) -> BatchNullConfig:
@@ -441,14 +571,3 @@ def _write_text(path: Path, value: str) -> None:
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)
-
-
-def _source_revision() -> str:
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=Path(__file__).resolve().parents[2],
-        capture_output=True,
-        check=False,
-        text=True,
-    )
-    return result.stdout.strip() if result.returncode == 0 else "unavailable"

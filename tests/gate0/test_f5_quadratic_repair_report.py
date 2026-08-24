@@ -11,13 +11,16 @@ import pandas as pd
 import pytest
 
 from research.gate0 import f5_quadratic_repair_report
+from research.gate0.config import derive_seed
 from research.gate0.f5_quadratic_repair_report import (
     write_f5_quadratic_repair_report,
 )
 from research.gate0.f5_quadratic_repair_runner import F5QuadraticRepairConfig
+from research.gate0.metrics import PermutationResult
 
 _BOUNDARY = 0.058242447845091264
 _RUN_ID = "f5-quadratic-unit"
+_SOURCE_REVISION = "48217ca03ce7c63e632c6449bdc175a323245f9b"
 
 
 @pytest.fixture(autouse=True)
@@ -28,6 +31,33 @@ def _retain_plot_path_without_a_graphics_runtime(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr(
         "research.gate0.f5_quadratic_repair_report._plot_batch_classes", write_plot
+    )
+    monkeypatch.setattr(
+        f5_quadratic_repair_report,
+        "permutation_distance_correlation",
+        _fast_permutation_metric,
+        raising=False,
+    )
+
+
+def _encoded_null(
+    observed: float, p_value: float, permutations: int, seed: int
+) -> np.ndarray:
+    exceedances = int(p_value * (permutations + 1) - 1)
+    values = np.full(permutations, observed / 2.0, dtype=float)
+    values[:exceedances] = observed
+    return values[np.random.default_rng(seed).permutation(permutations)]
+
+
+def _fast_permutation_metric(
+    left: np.ndarray, right: np.ndarray, permutations: int, seed: int
+) -> PermutationResult:
+    observed = float(left[0])
+    p_value = float(right[0])
+    return PermutationResult(
+        observed,
+        _encoded_null(observed, p_value, permutations, seed),
+        p_value,
     )
 
 
@@ -122,19 +152,32 @@ def _records(
                     "replication": replication,
                     "observed_statistic": 0.01 if batch < null_like_batches else 0.20,
                     "permutation_p_value": 0.05 if index < low_p_values else 0.50,
-                    "residual_samples_path": "residual_samples/retained.csv",
-                    "null_statistics_path": "null_statistics/retained.npy",
+                    "residual_samples_path": (
+                        f"residual_samples/batch-{batch}-replication-{replication}.csv"
+                    ),
+                    "null_statistics_path": (
+                        f"null_statistics/batch-{batch}-replication-{replication}.npy"
+                    ),
                     "seed_namespace": "batch-f5-quadratic-repair",
-                    "fixture_seed": index + 1,
-                    "residual_seed": index + 2,
-                    "permutation_seed": index + 3,
+                    "fixture_seed": derive_seed(
+                        "batch-f5-quadratic-repair", batch, replication, "fixture"
+                    ),
+                    "residual_seed": derive_seed(
+                        "batch-f5-quadratic-repair", batch, replication, "residual"
+                    ),
+                    "permutation_seed": derive_seed(
+                        "batch-f5-quadratic-repair", batch, replication, "permutation"
+                    ),
                     "elapsed_seconds": 0.01,
                     "run_id": _RUN_ID,
                     "warnings": None,
                     "exception_text": None,
                 }
             )
-    return pd.DataFrame(rows)
+    frame = pd.DataFrame(rows)
+    for column in ("fixture_seed", "residual_seed", "permutation_seed"):
+        frame[column] = pd.Series(frame[column], dtype="UInt64")
+    return frame
 
 
 def _write_runner_inputs(path: Path, records: pd.DataFrame) -> None:
@@ -157,18 +200,45 @@ def _write_runner_inputs(path: Path, records: pd.DataFrame) -> None:
                 "phase": "f5-quadratic-repair",
                 "run_id": _RUN_ID,
                 "seed_namespace": "batch-f5-quadratic-repair",
-                "source_revision": "source-test-sha",
+                "source_revision": _SOURCE_REVISION,
+                "attempted_records": 1_000,
                 "uses_splines": False,
             }
         ),
         encoding="utf-8",
     )
-    residual_path = path / "residual_samples" / "retained.csv"
-    residual_path.parent.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({"X1": [0.0], "X2": [0.0]}).to_csv(residual_path, index=False)
-    null_path = path / "null_statistics" / "retained.npy"
-    null_path.parent.mkdir(parents=True, exist_ok=True)
-    np.save(null_path, np.array([0.01]))
+    template_dir = path / ".test-templates"
+    template_dir.mkdir()
+    residual_templates: dict[tuple[float, float], Path] = {}
+    for observed, p_value in set(
+        records[["observed_statistic", "permutation_p_value"]]
+        .dropna()
+        .itertuples(index=False, name=None)
+    ):
+        key = (float(observed), float(p_value))
+        template = template_dir / f"residual-{observed}-{p_value}.csv"
+        left = np.zeros(1_000, dtype=float)
+        right = np.zeros(1_000, dtype=float)
+        left[0], right[0] = key
+        pd.DataFrame({"X1": left, "X2": right}).to_csv(template, index=False)
+        residual_templates[key] = template
+    for row in records.itertuples(index=False):
+        if isinstance(row.exception_text, str) and row.exception_text:
+            continue
+        residual_path = path / row.residual_samples_path
+        residual_path.parent.mkdir(parents=True, exist_ok=True)
+        key = (float(row.observed_statistic), float(row.permutation_p_value))
+        if not residual_path.exists():
+            residual_path.hardlink_to(residual_templates[key])
+        null_path = path / row.null_statistics_path
+        null_path.parent.mkdir(parents=True, exist_ok=True)
+        if not null_path.exists():
+            np.save(
+                null_path,
+                _encoded_null(
+                    key[0], key[1], 199, int(row.permutation_seed)
+                ),
+            )
 
 
 def _prepared_report(
@@ -287,6 +357,257 @@ def test_nondefault_direct_report_config_is_refused_before_report_output(
         )
 
     assert not (output / "manifest.json").exists()
+
+
+def test_supplied_records_must_exactly_match_canonical_disk_records(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A caller frame cannot drive a decision different from hashed records.csv."""
+
+    disk_records = _records()
+    output, calibration, f5_stop = _prepared_report(
+        tmp_path, monkeypatch, disk_records
+    )
+    supplied_records = disk_records.copy()
+    supplied_records.loc[0, "observed_statistic"] = 0.90
+
+    with pytest.raises(ValueError, match="exactly match retained records.csv"):
+        write_f5_quadratic_repair_report(
+            supplied_records,
+            output,
+            _RUN_ID,
+            calibration,
+            f5_stop,
+            F5QuadraticRepairConfig(),
+        )
+
+    assert not (output / "manifest.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("source_revision", None),
+        ("source_revision", "not-a-commit"),
+        ("source_revision", "b" * 40),
+    ],
+)
+def test_runner_source_revision_is_required_and_must_be_a_full_sha(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: str | None,
+) -> None:
+    """Report provenance cannot fall back to report-time HEAD or arbitrary text."""
+
+    records = _records()
+    output, calibration, f5_stop = _prepared_report(tmp_path, monkeypatch, records)
+    input_path = output / "manifest-input.json"
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    if value is None:
+        payload.pop(field)
+    else:
+        payload[field] = value
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="source revision"):
+        write_f5_quadratic_repair_report(
+            records,
+            output,
+            _RUN_ID,
+            calibration,
+            f5_stop,
+            F5QuadraticRepairConfig(),
+        )
+
+    assert not (output / "manifest.json").exists()
+
+
+@pytest.mark.parametrize("attempted_records", [None, 999])
+def test_runner_attempted_record_provenance_is_exact(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    attempted_records: int | None,
+) -> None:
+    """Missing or changed attempted-record provenance cannot authorize a report."""
+
+    records = _records()
+    output, calibration, f5_stop = _prepared_report(tmp_path, monkeypatch, records)
+    input_path = output / "manifest-input.json"
+    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    if attempted_records is None:
+        payload.pop("attempted_records")
+    else:
+        payload["attempted_records"] = attempted_records
+    input_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="runner provenance"):
+        write_f5_quadratic_repair_report(
+            records,
+            output,
+            _RUN_ID,
+            calibration,
+            f5_stop,
+            F5QuadraticRepairConfig(),
+        )
+
+    assert not (output / "manifest.json").exists()
+
+
+@pytest.mark.parametrize(
+    "column", ["residual_samples_path", "null_statistics_path"]
+)
+def test_success_evidence_paths_cannot_alias_another_cell(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    column: str,
+) -> None:
+    """Every successful cell must retain its own canonical evidence path."""
+
+    records = _records()
+    records.loc[1, column] = records.loc[0, column]
+    output, calibration, f5_stop = _prepared_report(tmp_path, monkeypatch, records)
+
+    with pytest.raises(ValueError, match="canonical"):
+        write_f5_quadratic_repair_report(
+            records,
+            output,
+            _RUN_ID,
+            calibration,
+            f5_stop,
+            F5QuadraticRepairConfig(),
+        )
+
+    assert not (output / "manifest.json").exists()
+
+
+@pytest.mark.parametrize("corruption", ["columns", "rows", "nonfinite"])
+def test_corrupt_residual_sample_is_refused(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    corruption: str,
+) -> None:
+    """Residual schema, configured row count, and finiteness are decision inputs."""
+
+    records = _records()
+    output, calibration, f5_stop = _prepared_report(tmp_path, monkeypatch, records)
+    residual_path = output / records.loc[0, "residual_samples_path"]
+    residuals = pd.read_csv(residual_path)
+    if corruption == "columns":
+        residuals = residuals.rename(columns={"X2": "wrong"})
+    elif corruption == "rows":
+        residuals = residuals.iloc[:-1]
+    else:
+        residuals.loc[0, "X1"] = np.inf
+    residuals.to_csv(residual_path, index=False)
+
+    with pytest.raises(ValueError, match="residual sample"):
+        write_f5_quadratic_repair_report(
+            records,
+            output,
+            _RUN_ID,
+            calibration,
+            f5_stop,
+            F5QuadraticRepairConfig(),
+        )
+
+    assert not (output / "manifest.json").exists()
+
+
+@pytest.mark.parametrize("corruption", ["length", "nonfinite", "value"])
+def test_corrupt_null_array_is_refused(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    corruption: str,
+) -> None:
+    """Null shape, finiteness, and seeded values must match recomputation."""
+
+    records = _records()
+    output, calibration, f5_stop = _prepared_report(tmp_path, monkeypatch, records)
+    null_path = output / records.loc[0, "null_statistics_path"]
+    values = np.load(null_path)
+    if corruption == "length":
+        values = values[:-1]
+    elif corruption == "nonfinite":
+        values[0] = np.inf
+    else:
+        values[0] += 0.001
+    np.save(null_path, values)
+
+    with pytest.raises(ValueError, match="null array"):
+        write_f5_quadratic_repair_report(
+            records,
+            output,
+            _RUN_ID,
+            calibration,
+            f5_stop,
+            F5QuadraticRepairConfig(),
+        )
+
+    assert not (output / "manifest.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("column", "value", "message"),
+    [
+        ("observed_statistic", 0.90, "observed dCor"),
+        ("permutation_p_value", 0.25, "empirical p-value"),
+        ("permutation_seed", 1, "derived seed"),
+    ],
+)
+def test_cell_metric_and_seed_identity_must_match_retained_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    column: str,
+    value: float | int,
+    message: str,
+) -> None:
+    """Changed record results or seeds cannot survive disk-consistent tampering."""
+
+    records = _records()
+    output, calibration, f5_stop = _prepared_report(tmp_path, monkeypatch, records)
+    records.loc[0, column] = value
+    if column.endswith("_seed"):
+        records[column] = pd.Series(records[column], dtype="UInt64")
+    records.to_csv(output / "records.csv", index=False)
+
+    with pytest.raises(ValueError, match=message):
+        write_f5_quadratic_repair_report(
+            records,
+            output,
+            _RUN_ID,
+            calibration,
+            f5_stop,
+            F5QuadraticRepairConfig(),
+        )
+
+    assert not (output / "manifest.json").exists()
+
+
+def test_csv_round_trip_metric_drift_is_accepted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sub-picounit dCor drift from CSV float round-trip is not corruption."""
+
+    def rounded_metric(
+        left: np.ndarray, right: np.ndarray, permutations: int, seed: int
+    ) -> PermutationResult:
+        exact = _fast_permutation_metric(left, right, permutations, seed)
+        return PermutationResult(
+            exact.observed + 1e-14,
+            exact.null_statistics + 1e-14,
+            exact.p_value,
+        )
+
+    monkeypatch.setattr(
+        f5_quadratic_repair_report,
+        "permutation_distance_correlation",
+        rounded_metric,
+    )
+
+    memo = _write_report(tmp_path, monkeypatch, _records(null_like_batches=85))
+
+    assert "Terminal outcome: **PASS**" in memo.read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize(
