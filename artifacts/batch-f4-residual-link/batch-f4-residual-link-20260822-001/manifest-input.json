@@ -1,0 +1,25 @@
+{
+  "attempted_records": 1000,
+  "config": {
+    "batches": 100,
+    "detection_boundary": 0.058242447845091264,
+    "minimum_detected_batches": 85,
+    "minimum_low_p_values_per_detected_batch": 8,
+    "n_splits": 5,
+    "permutations": 199,
+    "replications_per_batch": 10,
+    "ridge_alpha": 1.0,
+    "rows": 1000,
+    "spline_degree": 3,
+    "spline_knots": 5
+  },
+  "fixture_id": "F4-residual-link",
+  "pair": [
+    "X1",
+    "X3"
+  ],
+  "phase": "f4-residual-link",
+  "run_id": "batch-f4-residual-link-20260822-001",
+  "seed_namespace": "batch-f4-residual-link",
+  "source_revision": "c43ebb7acecf1f416f1571ee03b1e6a189c3d97c"
+}
