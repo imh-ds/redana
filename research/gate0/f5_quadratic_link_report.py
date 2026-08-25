@@ -53,7 +53,7 @@ def write_f5_quadratic_link_report(
 
     _validate_records(records, output_dir, run_id)
     f5_quadratic_repair = _verified_f5_quadratic_repair(f5_quadratic_repair_dir)
-    calibration = _verified_calibration(calibration_dir)
+    calibration = _verified_frozen_calibration(calibration_dir)
     boundary = float(calibration["selection"]["boundary"])
     if boundary != config.detection_boundary:
         raise ValueError("calibration boundary does not match the frozen detection boundary")
@@ -140,6 +140,15 @@ def _verify_parent_hashes(directory: Path, expected: dict[str, str], label: str)
             raise ValueError(f"{label} evidence is missing SHA-256-pinned {path.name}")
         if _sha256(path) != expected[key]:
             raise ValueError(f"{label} {path.name} SHA-256 does not match frozen provenance")
+
+
+def _verified_frozen_calibration(calibration_dir: Path) -> dict[str, object]:
+    _verify_parent_hashes(calibration_dir, _CALIBRATION_HASHES, "calibration")
+    calibration = _verified_calibration(calibration_dir)
+    for key, expected in _CALIBRATION_HASHES.items():
+        if calibration.get(key) != expected:
+            raise ValueError(f"calibration {key} does not match frozen SHA-256 provenance")
+    return calibration
 
 
 def _verified_f5_quadratic_repair(f5_quadratic_repair_dir: Path) -> dict[str, object]:
