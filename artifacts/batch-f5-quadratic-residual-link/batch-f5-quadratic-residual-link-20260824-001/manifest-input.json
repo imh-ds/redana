@@ -1,0 +1,27 @@
+{
+  "attempted_records": 1000,
+  "basis": "raw-plus-square",
+  "config": {
+    "batches": 100,
+    "detection_boundary": 0.058242447845091264,
+    "minimum_detected_batches": 85,
+    "minimum_low_p_values_per_detected_batch": 8,
+    "n_splits": 5,
+    "permutations": 199,
+    "replications_per_batch": 10,
+    "ridge_alpha": 1.0,
+    "rows": 1000,
+    "spline_degree": 3,
+    "spline_knots": 5
+  },
+  "fixture_id": "F5-quadratic-residual-link",
+  "pair": [
+    "X1",
+    "X2"
+  ],
+  "phase": "f5-quadratic-residual-link",
+  "run_id": "batch-f5-quadratic-residual-link-20260824-001",
+  "seed_namespace": "batch-f5-quadratic-residual-link",
+  "source_revision": "9ca2c91d6b2cd5a9edd8921a12f91801009829f8",
+  "uses_splines": false
+}
