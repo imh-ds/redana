@@ -1,0 +1,25 @@
+{
+  "attempted_records": 1000,
+  "config": {
+    "batches": 100,
+    "detection_boundary": 0.058242447845091264,
+    "minimum_detected_batches": 85,
+    "minimum_low_p_values_per_detected_batch": 8,
+    "n_splits": 5,
+    "permutations": 199,
+    "replications_per_batch": 10,
+    "ridge_alpha": 1.0,
+    "rows": 1000,
+    "spline_degree": 3,
+    "spline_knots": 5
+  },
+  "fixture_id": "F8",
+  "pair": [
+    "X1",
+    "X2"
+  ],
+  "phase": "f8-mixed-direct-indirect-path-detection",
+  "run_id": "batch-f8-mixed-direct-indirect-path-detection-20260825-001",
+  "seed_namespace": "batch-f8-mixed-direct-indirect-path-detection",
+  "source_revision": "7649189838f1f24a0ad487f17b22184aa68ab7c6"
+}
