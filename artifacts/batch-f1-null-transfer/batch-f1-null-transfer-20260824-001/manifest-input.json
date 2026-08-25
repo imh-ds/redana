@@ -1,0 +1,22 @@
+{
+  "attempted_records": 1000,
+  "config": {
+    "batches": 100,
+    "n_splits": 5,
+    "permutations": 199,
+    "replications_per_batch": 10,
+    "ridge_alpha": 1.0,
+    "rows": 1000,
+    "spline_degree": 3,
+    "spline_knots": 5
+  },
+  "fixture_id": "F1",
+  "pair": [
+    "X1",
+    "X2"
+  ],
+  "phase": "f1-null-transfer",
+  "run_id": "batch-f1-null-transfer-20260824-001",
+  "seed_namespace": "batch-f1-null-transfer",
+  "source_revision": "05e5ad9596eefd788cafba124dbda84a15e48e40"
+}
