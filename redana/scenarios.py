@@ -60,6 +60,37 @@ def generate_stage1_linear_fixture(
     return frame, true_edges
 
 
+def generate_stage2_shape_fixture(
+    n_rows: int, seed: int, shape: float, coefficient: float = _FIXTURE_COEFFICIENT
+) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
+    """Generate the Stage II round 2 relationship-shape fixture: two independent pairs
+    blending a linear term and a centered quadratic term.
+
+    ``outline/plan.md`` section 6's "relationship shape" dimension: "pure
+    linear -> slight curvature -> moderate curvature -> strong
+    nonlinearity." ``shape`` blends the two terms linearly (``0.0`` is
+    pure linear, ``1.0`` is pure quadratic, reproducing
+    ``generate_stage1_nonlinear_fixture`` exactly at the same
+    ``coefficient``). ``coefficient`` defaults to Stage I's strong
+    baseline (``0.7``) and is held fixed by Stage II round 2
+    (``docs/superpowers/specs/2026-08-25-stage2-relationship-shape-degradation-design.md``),
+    which sweeps ``shape`` instead.
+    """
+
+    rng = np.random.default_rng(seed)
+    e1, e2, e3, e4, e5, e6 = rng.standard_normal((6, n_rows))
+
+    x1 = e1
+    x2 = coefficient * ((1 - shape) * x1 + shape * (x1**2 - 1)) + e2
+    x3 = e3
+    x4 = coefficient * ((1 - shape) * x3 + shape * (x3**2 - 1)) + e4
+    x5, x6 = e5, e6
+
+    frame = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "X4": x4, "X5": x5, "X6": x6})
+    true_edges = frozenset({("X1", "X2"), ("X3", "X4")})
+    return frame, true_edges
+
+
 def generate_stage1_nonlinear_fixture(
     n_rows: int, seed: int, coefficient: float = _FIXTURE_COEFFICIENT
 ) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
