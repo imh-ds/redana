@@ -1,0 +1,80 @@
+{
+  "selected_arm": {
+    "n_splits": 2,
+    "alpha": 0.15
+  },
+  "control_arm": {
+    "n_splits": 5,
+    "alpha": 0.05
+  },
+  "cells": {
+    "n100_c0.15": {
+      "n_rows": 100,
+      "coefficient": 0.15,
+      "selected": {
+        "detection": 0.14,
+        "precision": 0.1485238095238095,
+        "recall": 0.14
+      },
+      "control": {
+        "detection": 0.01,
+        "precision": 0.01,
+        "recall": 0.01
+      },
+      "detection_improvement": 0.13,
+      "precision_delta": 0.1385238095238095,
+      "clears_bar": false
+    },
+    "n100_c0.2": {
+      "n_rows": 100,
+      "coefficient": 0.2,
+      "selected": {
+        "detection": 0.14,
+        "precision": 0.12666666666666665,
+        "recall": 0.14
+      },
+      "control": {
+        "detection": 0.01,
+        "precision": 0.01,
+        "recall": 0.01
+      },
+      "detection_improvement": 0.13,
+      "precision_delta": 0.11666666666666665,
+      "clears_bar": false
+    },
+    "n200_c0.15": {
+      "n_rows": 200,
+      "coefficient": 0.15,
+      "selected": {
+        "detection": 0.15,
+        "precision": 0.13816666666666666,
+        "recall": 0.15
+      },
+      "control": {
+        "detection": 0.0,
+        "precision": 0.0,
+        "recall": 0.0
+      },
+      "detection_improvement": 0.15,
+      "precision_delta": 0.13816666666666666,
+      "clears_bar": true
+    },
+    "n200_c0.2": {
+      "n_rows": 200,
+      "coefficient": 0.2,
+      "selected": {
+        "detection": 0.21,
+        "precision": 0.22238095238095235,
+        "recall": 0.21
+      },
+      "control": {
+        "detection": 0.01,
+        "precision": 0.01,
+        "recall": 0.01
+      },
+      "detection_improvement": 0.19999999999999998,
+      "precision_delta": 0.21238095238095234,
+      "clears_bar": true
+    }
+  }
+}
