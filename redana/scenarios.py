@@ -70,6 +70,7 @@ def generate_stage1_linear_fixture(
     coefficient: float = _FIXTURE_COEFFICIENT,
     noise_scale: float = 1.0,
     distribution: str = "gaussian",
+    heteroskedasticity: float = 0.0,
 ) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
     """Generate the Stage I linear fixture: a linear chain plus three independent columns.
 
@@ -87,15 +88,22 @@ def generate_stage1_linear_fixture(
     ``distribution`` defaults to ``"gaussian"`` (Stage I's exact error
     shape); Stage II round 4
     (``docs/superpowers/specs/2026-08-25-stage2-distribution-degradation-design.md``)
-    sweeps it to study distribution degradation.
+    sweeps it to study distribution degradation. ``heteroskedasticity``
+    defaults to ``0.0`` (Stage I's exact constant-variance noise); Stage
+    II round 5
+    (``docs/superpowers/specs/2026-08-25-stage2-residual-variance-degradation-design.md``)
+    sweeps it to study residual-variance degradation, scaling each
+    downstream variable's own residual noise standard deviation by
+    ``1 + heteroskedasticity * abs(source)``, never touching a source
+    variable's own draw.
     """
 
     rng = np.random.default_rng(seed)
     e1, e2, e3, e4, e5, e6 = _draw_errors(rng, n_rows, distribution)
 
     x1 = e1
-    x2 = coefficient * x1 + noise_scale * e2
-    x3 = coefficient * x2 + noise_scale * e3
+    x2 = coefficient * x1 + noise_scale * (1 + heteroskedasticity * np.abs(x1)) * e2
+    x3 = coefficient * x2 + noise_scale * (1 + heteroskedasticity * np.abs(x2)) * e3
     x4, x5, x6 = e4, e5, e6
 
     frame = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "X4": x4, "X5": x5, "X6": x6})
@@ -140,6 +148,7 @@ def generate_stage1_nonlinear_fixture(
     coefficient: float = _FIXTURE_COEFFICIENT,
     noise_scale: float = 1.0,
     distribution: str = "gaussian",
+    heteroskedasticity: float = 0.0,
 ) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
     """Generate the Stage I pure nonlinear fixture: two independent quadratic pairs.
 
@@ -156,15 +165,20 @@ def generate_stage1_nonlinear_fixture(
     noise term, not the source variables' noise. ``distribution``
     defaults to ``"gaussian"`` (Stage I's exact error shape); Stage II
     round 4 sweeps it to study distribution degradation.
+    ``heteroskedasticity`` defaults to ``0.0`` (Stage I's exact
+    constant-variance noise); Stage II round 5 sweeps it to study
+    residual-variance degradation, scaling each downstream variable's own
+    residual noise standard deviation by ``1 + heteroskedasticity *
+    abs(source)``, never touching a source variable's own draw.
     """
 
     rng = np.random.default_rng(seed)
     e1, e2, e3, e4, e5, e6 = _draw_errors(rng, n_rows, distribution)
 
     x1 = e1
-    x2 = coefficient * (x1**2 - 1) + noise_scale * e2
+    x2 = coefficient * (x1**2 - 1) + noise_scale * (1 + heteroskedasticity * np.abs(x1)) * e2
     x3 = e3
-    x4 = coefficient * (x3**2 - 1) + noise_scale * e4
+    x4 = coefficient * (x3**2 - 1) + noise_scale * (1 + heteroskedasticity * np.abs(x3)) * e4
     x5, x6 = e5, e6
 
     frame = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "X4": x4, "X5": x5, "X6": x6})
