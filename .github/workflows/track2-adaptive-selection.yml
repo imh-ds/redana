@@ -1,0 +1,74 @@
+name: Track 2 Adaptive Selection
+
+# Manually-triggered only (no push/PR trigger). Shards
+# docs/superpowers/specs/2026-08-26-track2-adaptive-selection-charter.md's
+# evaluation grid across parallel jobs. See
+# scripts/run_adaptive_selection_shard.py and
+# scripts/aggregate_adaptive_selection.py for what each job computes.
+
+on:
+  workflow_dispatch: {}
+  # workflow_dispatch can only be invoked via API/CLI once a workflow file
+  # exists on the repo's default branch. Scoped push trigger to fire it
+  # directly from this branch instead; remove once this either merges or
+  # moves to workflow_dispatch-only.
+  push:
+    branches:
+      - codex/batch-null-calibration
+
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - n_rows: 100
+            coefficient: "0.15"
+          - n_rows: 100
+            coefficient: "0.7"
+          - n_rows: 300
+            coefficient: "0.15"
+          - n_rows: 300
+            coefficient: "0.7"
+          - n_rows: 500
+            coefficient: "0.15"
+          - n_rows: 500
+            coefficient: "0.7"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - name: Run shard
+        run: |
+          python scripts/run_adaptive_selection_shard.py \
+            --n-rows "${{ matrix.n_rows }}" \
+            --coefficient "${{ matrix.coefficient }}" \
+            --out result.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-n${{ matrix.n_rows }}-c${{ matrix.coefficient }}
+          path: result.json
+
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - uses: actions/download-artifact@v4
+        with:
+          path: shards
+      - name: Aggregate shards into the accuracy table
+        run: python scripts/aggregate_adaptive_selection.py shards | tee summary.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: adaptive-selection-summary
+          path: |
+            summary.txt
+            scripts/adaptive_selection_results.json
