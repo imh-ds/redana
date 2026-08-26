@@ -142,6 +142,86 @@ def generate_stage1_linear_fixture(
     return frame, true_edges
 
 
+def generate_stage2_hub_fixture(
+    n_rows: int, seed: int, coefficient: float = _FIXTURE_COEFFICIENT
+) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
+    """Generate the Stage II round 7 hub fixture: one central variable with three spokes.
+
+    ``outline/plan.md`` section 6's "network structure" dimension:
+    "chain -> hubs -> communities -> redundant predictors." ``X1`` is the
+    hub, directly driving ``X2``, ``X3``, and ``X4`` (degree 3), versus
+    the chain fixture's maximum node degree of 2.
+    """
+
+    rng = np.random.default_rng(seed)
+    e1, e2, e3, e4, e5, e6 = rng.standard_normal((6, n_rows))
+
+    x1 = e1
+    x2 = coefficient * x1 + e2
+    x3 = coefficient * x1 + e3
+    x4 = coefficient * x1 + e4
+    x5, x6 = e5, e6
+
+    frame = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "X4": x4, "X5": x5, "X6": x6})
+    true_edges = frozenset({("X1", "X2"), ("X1", "X3"), ("X1", "X4")})
+    return frame, true_edges
+
+
+def generate_stage2_community_fixture(
+    n_rows: int, seed: int, coefficient: float = _FIXTURE_COEFFICIENT
+) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
+    """Generate the Stage II round 7 community fixture: two disjoint three-node chains.
+
+    ``outline/plan.md`` section 6's "network structure" dimension. Unlike
+    the chain fixture (one chain plus three independent columns), this
+    fixture has *two* independent structural clusters, each with the
+    same already-validated chain topology.
+    """
+
+    rng = np.random.default_rng(seed)
+    e1, e2, e3, e4, e5, e6 = rng.standard_normal((6, n_rows))
+
+    x1 = e1
+    x2 = coefficient * x1 + e2
+    x3 = coefficient * x2 + e3
+    x4 = e4
+    x5 = coefficient * x4 + e5
+    x6 = coefficient * x5 + e6
+
+    frame = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "X4": x4, "X5": x5, "X6": x6})
+    true_edges = frozenset({("X1", "X2"), ("X2", "X3"), ("X4", "X5"), ("X5", "X6")})
+    return frame, true_edges
+
+
+def generate_stage2_redundant_predictors_fixture(
+    n_rows: int,
+    seed: int,
+    coefficient: float = _FIXTURE_COEFFICIENT,
+    redundancy: float = 0.9,
+) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
+    """Generate the Stage II round 7 redundant-predictors fixture.
+
+    ``outline/plan.md`` section 6's "network structure" dimension. ``X2``
+    is a near-collinear ("redundant") copy of ``X1`` (correlation
+    ``redundancy``), but only ``X1`` is a true direct cause of ``X3``.
+    Detecting ``(X2, X3)`` would be a false positive driven by
+    collinearity, not a real direct effect -- the central question this
+    fixture tests.
+    """
+
+    rng = np.random.default_rng(seed)
+    e1, e2, e3, e4, e5, e6 = rng.standard_normal((6, n_rows))
+
+    x1 = e1
+    x2 = redundancy * x1 + np.sqrt(1 - redundancy**2) * e2
+    x3 = coefficient * x1 + e3
+    x4, x5, x6 = e4, e5, e6
+
+    frame = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "X4": x4, "X5": x5, "X6": x6})
+    true_edges = frozenset({("X1", "X3")})
+    return frame, true_edges
+
+
 def generate_stage2_shape_fixture(
     n_rows: int, seed: int, shape: float, coefficient: float = _FIXTURE_COEFFICIENT
 ) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
