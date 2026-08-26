@@ -6,6 +6,36 @@ import numpy as np
 import pandas as pd
 
 _FIXTURE_COEFFICIENT = 0.7
+_VALID_DISTRIBUTIONS = frozenset({"gaussian", "skewed", "heavy_tailed"})
+
+
+def _draw_errors(
+    rng: np.random.Generator, n_rows: int, distribution: str
+) -> tuple[np.ndarray, ...]:
+    """Draw six standardized (mean 0, variance 1) error columns.
+
+    ``distribution`` selects the shape: ``"gaussian"`` (standard normal),
+    ``"skewed"`` (centered/scaled chi-squared, df=3, positive skew), or
+    ``"heavy_tailed"`` (scaled Student's t, df=3, heavier tails than
+    Gaussian). All three are standardized to the same mean and variance
+    so only distributional shape varies, matching
+    ``outline/plan.md`` section 6's "Gaussian -> skewed -> heavy-tailed"
+    dimension.
+    """
+
+    if distribution not in _VALID_DISTRIBUTIONS:
+        raise ValueError(
+            f"unknown distribution {distribution!r}; expected one of {sorted(_VALID_DISTRIBUTIONS)}"
+        )
+
+    if distribution == "gaussian":
+        draws = rng.standard_normal((6, n_rows))
+    elif distribution == "skewed":
+        draws = (rng.chisquare(df=3, size=(6, n_rows)) - 3) / np.sqrt(6)
+    else:
+        draws = rng.standard_t(df=3, size=(6, n_rows)) / np.sqrt(3)
+
+    return tuple(draws)
 
 
 def generate_step4_validation_frame(
@@ -39,6 +69,7 @@ def generate_stage1_linear_fixture(
     seed: int,
     coefficient: float = _FIXTURE_COEFFICIENT,
     noise_scale: float = 1.0,
+    distribution: str = "gaussian",
 ) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
     """Generate the Stage I linear fixture: a linear chain plus three independent columns.
 
@@ -53,10 +84,14 @@ def generate_stage1_linear_fixture(
     (``docs/superpowers/specs/2026-08-25-stage2-noise-degradation-design.md``)
     sweeps it to study noise degradation, scaling only each downstream
     variable's own residual noise term, not the source variables' noise.
+    ``distribution`` defaults to ``"gaussian"`` (Stage I's exact error
+    shape); Stage II round 4
+    (``docs/superpowers/specs/2026-08-25-stage2-distribution-degradation-design.md``)
+    sweeps it to study distribution degradation.
     """
 
     rng = np.random.default_rng(seed)
-    e1, e2, e3, e4, e5, e6 = rng.standard_normal((6, n_rows))
+    e1, e2, e3, e4, e5, e6 = _draw_errors(rng, n_rows, distribution)
 
     x1 = e1
     x2 = coefficient * x1 + noise_scale * e2
@@ -104,6 +139,7 @@ def generate_stage1_nonlinear_fixture(
     seed: int,
     coefficient: float = _FIXTURE_COEFFICIENT,
     noise_scale: float = 1.0,
+    distribution: str = "gaussian",
 ) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
     """Generate the Stage I pure nonlinear fixture: two independent quadratic pairs.
 
@@ -117,11 +153,13 @@ def generate_stage1_nonlinear_fixture(
     degradation. ``noise_scale`` defaults to ``1.0`` (Stage I's exact
     residual noise magnitude); Stage II round 3 sweeps it to study noise
     degradation, scaling only each downstream variable's own residual
-    noise term, not the source variables' noise.
+    noise term, not the source variables' noise. ``distribution``
+    defaults to ``"gaussian"`` (Stage I's exact error shape); Stage II
+    round 4 sweeps it to study distribution degradation.
     """
 
     rng = np.random.default_rng(seed)
-    e1, e2, e3, e4, e5, e6 = rng.standard_normal((6, n_rows))
+    e1, e2, e3, e4, e5, e6 = _draw_errors(rng, n_rows, distribution)
 
     x1 = e1
     x2 = coefficient * (x1**2 - 1) + noise_scale * e2
