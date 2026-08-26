@@ -38,6 +38,29 @@ def _draw_errors(
     return tuple(draws)
 
 
+def _apply_measurement_error(
+    columns: dict[str, np.ndarray], rng: np.random.Generator, measurement_error: float
+) -> dict[str, np.ndarray]:
+    """Add independent Gaussian measurement noise to each already-realized column.
+
+    ``measurement_error`` is a noise-to-signal variance ratio relative to
+    each column's own realized sample standard deviation, equivalently
+    reliability ``1 / (1 + measurement_error)``. At ``0.0`` the columns
+    are returned numerically unchanged, since ``sqrt(0) == 0``. Always
+    Gaussian, independent of the ``distribution`` parameter, since
+    measurement error is conventionally modeled as instrument noise
+    distinct from the structural error terms.
+    """
+
+    n_rows = next(iter(columns.values())).shape[0]
+    noise = rng.standard_normal((len(columns), n_rows))
+    scale = np.sqrt(measurement_error)
+    return {
+        name: column + scale * column.std() * noise_row
+        for (name, column), noise_row in zip(columns.items(), noise, strict=True)
+    }
+
+
 def generate_step4_validation_frame(
     n_rows: int, seed: int
 ) -> tuple[pd.DataFrame, frozenset[tuple[str, str]], frozenset[tuple[str, str]]]:
@@ -71,6 +94,7 @@ def generate_stage1_linear_fixture(
     noise_scale: float = 1.0,
     distribution: str = "gaussian",
     heteroskedasticity: float = 0.0,
+    measurement_error: float = 0.0,
 ) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
     """Generate the Stage I linear fixture: a linear chain plus three independent columns.
 
@@ -95,7 +119,11 @@ def generate_stage1_linear_fixture(
     sweeps it to study residual-variance degradation, scaling each
     downstream variable's own residual noise standard deviation by
     ``1 + heteroskedasticity * abs(source)``, never touching a source
-    variable's own draw.
+    variable's own draw. ``measurement_error`` defaults to ``0.0``
+    (Stage I's exact perfect measurement); Stage II round 6
+    (``docs/superpowers/specs/2026-08-25-stage2-measurement-quality-degradation-design.md``)
+    sweeps it to study measurement-quality degradation, adding
+    independent Gaussian noise to every already-realized column.
     """
 
     rng = np.random.default_rng(seed)
@@ -106,7 +134,10 @@ def generate_stage1_linear_fixture(
     x3 = coefficient * x2 + noise_scale * (1 + heteroskedasticity * np.abs(x2)) * e3
     x4, x5, x6 = e4, e5, e6
 
-    frame = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "X4": x4, "X5": x5, "X6": x6})
+    columns = _apply_measurement_error(
+        {"X1": x1, "X2": x2, "X3": x3, "X4": x4, "X5": x5, "X6": x6}, rng, measurement_error
+    )
+    frame = pd.DataFrame(columns)
     true_edges = frozenset({("X1", "X2"), ("X2", "X3")})
     return frame, true_edges
 
@@ -149,6 +180,7 @@ def generate_stage1_nonlinear_fixture(
     noise_scale: float = 1.0,
     distribution: str = "gaussian",
     heteroskedasticity: float = 0.0,
+    measurement_error: float = 0.0,
 ) -> tuple[pd.DataFrame, frozenset[tuple[str, str]]]:
     """Generate the Stage I pure nonlinear fixture: two independent quadratic pairs.
 
@@ -170,6 +202,10 @@ def generate_stage1_nonlinear_fixture(
     residual-variance degradation, scaling each downstream variable's own
     residual noise standard deviation by ``1 + heteroskedasticity *
     abs(source)``, never touching a source variable's own draw.
+    ``measurement_error`` defaults to ``0.0`` (Stage I's exact perfect
+    measurement); Stage II round 6 sweeps it to study measurement-
+    quality degradation, adding independent Gaussian noise to every
+    already-realized column.
     """
 
     rng = np.random.default_rng(seed)
@@ -181,6 +217,9 @@ def generate_stage1_nonlinear_fixture(
     x4 = coefficient * (x3**2 - 1) + noise_scale * (1 + heteroskedasticity * np.abs(x3)) * e4
     x5, x6 = e5, e6
 
-    frame = pd.DataFrame({"X1": x1, "X2": x2, "X3": x3, "X4": x4, "X5": x5, "X6": x6})
+    columns = _apply_measurement_error(
+        {"X1": x1, "X2": x2, "X3": x3, "X4": x4, "X5": x5, "X6": x6}, rng, measurement_error
+    )
+    frame = pd.DataFrame(columns)
     true_edges = frozenset({("X1", "X2"), ("X3", "X4")})
     return frame, true_edges
