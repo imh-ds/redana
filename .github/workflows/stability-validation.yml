@@ -10,6 +10,13 @@ name: Stability Validation
 
 on:
   workflow_dispatch: {}
+  # workflow_dispatch can only be invoked via API/CLI once a workflow file
+  # exists on the repo's default branch, which this feature branch is not.
+  # Scoped push trigger to fire it directly from this branch instead;
+  # remove once this either merges or moves to workflow_dispatch-only.
+  push:
+    branches:
+      - codex/batch-null-calibration
 
 jobs:
   shard:
