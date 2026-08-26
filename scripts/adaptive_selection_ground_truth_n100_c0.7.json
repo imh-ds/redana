@@ -1,0 +1,9 @@
+{
+  "n_rows": 100,
+  "coefficient": 0.7,
+  "sensitive": {"detection": 0.550, "precision": 0.392, "recall": 0.550},
+  "normal": {"detection": 0.210, "precision": 0.149, "recall": 0.210},
+  "detection_improvement": 0.340,
+  "precision_delta": 0.243,
+  "objectively_better": "sensitive"
+}
