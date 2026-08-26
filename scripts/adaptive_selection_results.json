@@ -1,0 +1,58 @@
+{
+  "cells": [
+    {
+      "n_rows": 100,
+      "coefficient": 0.15,
+      "ground_truth": "sensitive",
+      "arbiter_accuracy": 0.13333333333333333,
+      "always_sensitive_accuracy": 1.0,
+      "always_normal_accuracy": 0.0,
+      "static_rule_accuracy": 1.0
+    },
+    {
+      "n_rows": 100,
+      "coefficient": 0.7,
+      "ground_truth": "sensitive",
+      "arbiter_accuracy": 0.26666666666666666,
+      "always_sensitive_accuracy": 1.0,
+      "always_normal_accuracy": 0.0,
+      "static_rule_accuracy": 1.0
+    },
+    {
+      "n_rows": 300,
+      "coefficient": 0.15,
+      "ground_truth": "sensitive",
+      "arbiter_accuracy": 0.26666666666666666,
+      "always_sensitive_accuracy": 1.0,
+      "always_normal_accuracy": 0.0,
+      "static_rule_accuracy": 0.0
+    },
+    {
+      "n_rows": 300,
+      "coefficient": 0.7,
+      "ground_truth": "normal",
+      "arbiter_accuracy": 0.5,
+      "always_sensitive_accuracy": 0.0,
+      "always_normal_accuracy": 1.0,
+      "static_rule_accuracy": 1.0
+    },
+    {
+      "n_rows": 500,
+      "coefficient": 0.15,
+      "ground_truth": "sensitive",
+      "arbiter_accuracy": 0.13333333333333333,
+      "always_sensitive_accuracy": 1.0,
+      "always_normal_accuracy": 0.0,
+      "static_rule_accuracy": 0.0
+    },
+    {
+      "n_rows": 500,
+      "coefficient": 0.7,
+      "ground_truth": "normal",
+      "arbiter_accuracy": 0.4,
+      "always_sensitive_accuracy": 0.0,
+      "always_normal_accuracy": 1.0,
+      "static_rule_accuracy": 1.0
+    }
+  ]
+}
