@@ -7,7 +7,11 @@ import pytest
 from redana.network import NetworkConfig
 from redana.residuals import PrototypeConfig
 from redana.scenarios import generate_stage1_nonlinear_fixture
-from redana.stability import bootstrap_edge_stability, classify_stability_tier
+from redana.stability import (
+    STABILITY_DISCLOSURE_CAVEAT,
+    bootstrap_edge_stability,
+    classify_stability_tier,
+)
 
 
 def test_bootstrap_edge_stability_covers_all_pairs() -> None:
@@ -53,13 +57,13 @@ def test_bootstrap_edge_stability_is_higher_for_true_edges() -> None:
 @pytest.mark.parametrize(
     "stability,expected_tier",
     [
-        (1.0, "core"),
-        (0.80, "core"),
-        (0.75, "core"),
-        (0.74999, "provisional"),
-        (0.40, "provisional"),
-        (0.399, "background"),
-        (0.0, "background"),
+        (1.0, "frequently_selected"),
+        (0.80, "frequently_selected"),
+        (0.75, "frequently_selected"),
+        (0.74999, "intermittently_selected"),
+        (0.40, "intermittently_selected"),
+        (0.399, "rarely_selected"),
+        (0.0, "rarely_selected"),
     ],
 )
 def test_classify_stability_tier(stability: float, expected_tier: str) -> None:
@@ -70,3 +74,9 @@ def test_classify_stability_tier(stability: float, expected_tier: str) -> None:
 def test_classify_stability_tier_rejects_out_of_range(invalid_stability: float) -> None:
     with pytest.raises(ValueError, match="stability"):
         classify_stability_tier(invalid_stability)
+
+
+def test_stability_disclosure_caveat_disclaims_replication_probability() -> None:
+    assert "not an estimate of independent-study replication probability" in (
+        STABILITY_DISCLOSURE_CAVEAT
+    )

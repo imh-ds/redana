@@ -104,8 +104,9 @@ def main() -> int:
             print(f"  true edge {edge}: mean bootstrap stability={_mean(values):.3f}")
             print(f"    per-dataset stability values: {[round(v, 3) for v in values]}")
             print(
-                f"    tier distribution: core={tiers.count('core')} "
-                f"provisional={tiers.count('provisional')} background={tiers.count('background')}"
+                f"    tier distribution: frequently_selected={tiers.count('frequently_selected')} "
+                f"intermittently_selected={tiers.count('intermittently_selected')} "
+                f"rarely_selected={tiers.count('rarely_selected')}"
             )
 
         incidental_values = [d[_INCIDENTAL_PAIR] for d in bootstrap_datasets]

@@ -38,20 +38,30 @@ before rerunning.
 
 ## Results
 
+Tier counts below use the relabeled tiers from
+`docs/superpowers/specs/2026-08-26-stability-tier-relabeling-addendum.md`
+(`frequently_selected` / `intermittently_selected` / `rarely_selected` --
+same `>=0.75` / `0.40-0.75` / `<0.40` thresholds as originally charted,
+labels only changed). Both the bootstrap subset (n=10 datasets) and the
+actual-replication rate (n=50 datasets) below carry meaningful Monte
+Carlo uncertainty at these sample sizes -- the counts and rates below are
+evidence that a gap exists in this cell, not precise population
+estimates of its size.
+
 ### well_powered (coefficient=0.7, n_rows=1000)
 
 | | actual replication (50 datasets) | mean bootstrap stability (10 datasets) | tier distribution |
 | --- | --- | --- | --- |
-| X1,X2 | 1.00 | 1.000 | core=10 |
-| X3,X4 | 1.00 | 1.000 | core=10 |
+| X1,X2 | 1.00 | 1.000 | frequently_selected=10 |
+| X3,X4 | 1.00 | 1.000 | frequently_selected=10 |
 | X5,X6 (incidental, null) | -- | 0.277 (range 0.06-0.78) | -- |
 
 ### marginal (coefficient=0.15, n_rows=1000)
 
 | | actual replication (50 datasets) | mean bootstrap stability (10 datasets) | tier distribution |
 | --- | --- | --- | --- |
-| X1,X2 | 0.34 | 0.780 (range 0.44-0.97) | core=7, provisional=3 |
-| X3,X4 | 0.34 | 0.806 (range 0.52-0.98) | core=7, provisional=3 |
+| X1,X2 | 0.34 | 0.780 (range 0.44-0.97) | frequently_selected=7, intermittently_selected=3 |
+| X3,X4 | 0.34 | 0.806 (range 0.52-0.98) | frequently_selected=7, intermittently_selected=3 |
 | X5,X6 (incidental, null) | -- | 0.244 (range 0.07-0.53) | -- |
 
 (`marginal`'s 0.34 actual replication rate is a fresh, independently-seeded
@@ -75,46 +85,57 @@ list.
 
 ## Interpretation
 
-**At a well-powered effect, bootstrap stability is a trustworthy proxy
-for actual replication -- both sit at ceiling and agree.** No surprise
-here, and not the interesting case.
+**At a well-powered effect, no disagreement was observed between
+bootstrap stability and actual replication -- both sit at ceiling
+(1.00).** This is a ceiling comparison, not a test of discrimination
+(everything looks perfect when nothing can distinguish "somewhat
+reliable" from "extremely reliable" at the top of the scale), so it is
+weak evidence that bootstrap stability is *calibrated* in this regime --
+only that it isn't obviously wrong here.
 
-**At a marginal effect, bootstrap stability is not a trustworthy proxy
-for actual replication -- it substantially overstates confidence.** Actual
-replication says this edge would only be detected in about 1 of every 3
-independent fresh datasets (0.34). Bootstrap stability, computed from a
-*single* dataset, says "core" (>=0.75, the highest tier) 7 times out of
-10. A researcher who only ever has one dataset -- the entire premise of
-why stability reporting is useful -- would see "core" stability roughly
-70% of the time for an edge that in truth only replicates a third of the
-time. **This is the opposite of a conservative error: it is false
-reassurance, delivered most often in exactly the low-power regime this
-whole track exists to serve.**
+**At a marginal effect, bootstrap stability and actual replication are
+measuring different quantities, and they diverge sharply.** Actual
+replication is an unconditional probability over fresh, independent
+datasets: this edge was detected in 0.34 of 50 independent draws.
+Bootstrap stability is a conditional, within-dataset selection frequency:
+given the one dataset a resample subset came from, how often does the
+edge survive reshuffling which rows are kept. In this tested cell, mean
+conditional bootstrap selection frequency was about 0.8 versus
+unconditional fresh-dataset detection of 0.34 -- and 7 of the 10
+bootstrapped datasets landed in the highest ("frequently_selected") tier.
+That 7/10 count has real sampling uncertainty at n=10 and should be read
+as "the tier can clearly mislead in this cell," not as a precise
+population rate. Even accounting for that uncertainty, the direction and
+rough size of the gap is not a sampling artifact: a researcher who only
+ever has one dataset -- the entire premise of why stability reporting is
+useful -- would see the highest tier far more often than the edge
+actually replicates.
 
-The mechanism is straightforward in hindsight: bootstrap resampling draws
-new samples *from the one dataset already in hand*, with replacement. It
-perturbs which rows are included, but it can never redraw the underlying
-population noise realization that dataset happened to get. If that one
-dataset's particular draw happened to show the relationship clearly
-(likely by chance when the true population effect is weak, since roughly
-a third of draws will), its resamples will keep finding it too -- because
-they're all built from the same lucky draw. Bootstrap stability measures
+The proposed mechanism has one part that is structurally guaranteed and
+one part that isn't yet isolated. Guaranteed by construction: ordinary
+nonparametric bootstrap resampling draws new samples *from the one
+dataset already in hand*, with replacement -- it perturbs which rows are
+included but can never redraw the underlying population-noise
+realization that dataset happened to get. So bootstrap stability measures
 **within-sample robustness to which rows you keep**, not
-**between-sample replicability on a fresh dataset**. These two concepts
-coincide when the signal is strong enough that almost every sample
-detects it (well_powered), and diverge sharply when detection is a
-coin-flip across samples (marginal) -- exactly where §14 asked the
-question.
+**between-sample replicability on a fresh dataset**, and these concepts
+can only coincide, not diverge, when they're forced to agree (e.g. near
+ceiling). Not yet isolated: how much of this specific gap's *size* comes
+from that structural fact alone, versus pipeline-specific amplifiers
+(thresholded edge selection, the FDR step, or the non-smooth
+graphical-lasso objective) -- no ablation was run to separate these
+contributions.
 
-**A second, smaller-but-real caveat: bootstrap stability on a genuinely
-null pair is not reliably low, even in a well-powered configuration.**
-X5,X6 has no true dependency in either configuration, yet its bootstrap
-stability ranged as high as 0.78 in one `well_powered` dataset -- enough
-to land in the "core" tier for a pair with zero real relationship. This
-is graphical_lasso's familiar small-sample false-positive behavior
-(observed throughout Stage I/II) resurfacing inside the bootstrap
-procedure specifically; it means even a "core"-tier stability reading
-should not, on its own, be read as proof an edge is real.
+**A second, smaller-but-real observation: in one of the ten
+`well_powered` datasets, a genuinely null pair's bootstrap stability
+reached 0.78**, enough to land in the "frequently_selected" tier despite
+X5,X6 having no true dependency in either configuration. With only one
+such observation among ten datasets, this is an illustrative
+counterexample -- proof that a high tier is not proof of a real edge --
+not an estimate of how often null pairs land in that tier. It is
+consistent with, but does not isolate, graphical_lasso's familiar
+small-sample false-positive behavior observed throughout Stage I/II as
+the contributing cause.
 
 ## Explicit boundary
 
@@ -155,3 +176,27 @@ assignment on the detectability lookup (Task 2) rather than reporting
 stability alone, redesign the tier system entirely, or reconsider Track
 1's viability as scoped is a decision for the project owner, not
 something this evidence note resolves on its own.
+
+## Follow-up: peer review and resolution
+
+This note's initial draft was independently peer-reviewed (adversarial
+review requested explicitly, not a rubric pass). The review confirmed the
+core finding but flagged overclaiming in the original language (since
+corrected above: "doubles true confidence" and "trustworthy proxy" were
+too strong for what was directly measured) and identified a flaw in the
+fix initially proposed alongside this note (auto-attaching a
+detectability-lookup caveat when a result falls in a "comparable regime"
+to the tested marginal cell) -- the lookup is keyed on the true
+population coefficient, which an applied researcher does not know,
+making "comparable regime" unoperationalizable outside simulation.
+
+The adopted resolution, per
+`docs/superpowers/specs/2026-08-26-stability-tier-relabeling-addendum.md`:
+relabel the tiers (`frequently_selected` / `intermittently_selected` /
+`rarely_selected`, thresholds unchanged) and attach a single,
+unconditional disclosure caveat
+(`redana.stability.STABILITY_DISCLOSURE_CAVEAT`) to every tier, always --
+no regime-matching, no identifiability assumption. The
+detectability-fusion idea is rejected, not deferred, for applied-data use;
+`redana.detectability` remains useful for simulation-facing evidence
+notes where the true coefficient is known.

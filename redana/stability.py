@@ -19,8 +19,23 @@ from redana.network import NetworkConfig
 from redana.prototype import run_prototype
 from redana.residuals import PrototypeConfig
 
-_CORE_THRESHOLD = 0.75
-_PROVISIONAL_THRESHOLD = 0.40
+_FREQUENT_THRESHOLD = 0.75
+_INTERMITTENT_THRESHOLD = 0.40
+
+STABILITY_DISCLOSURE_CAVEAT = (
+    "Bootstrap selection frequency reflects robustness to resampling this dataset. "
+    "It is not an estimate of independent-study replication probability."
+)
+"""Attach this verbatim wherever a stability tier is shown to a researcher.
+
+docs/evidence/stability-validation-20260826.md found that at a marginal effect
+size, mean bootstrap stability (a within-dataset resampling statistic) landed
+far above the actual between-dataset replication rate -- most datasets
+classified "frequently_selected" despite only ~1-in-3 true replication. The
+tier labels below were chosen, and this caveat added, specifically so neither
+implies a claim about independent-study replication that bootstrap stability
+cannot support. See docs/superpowers/specs/2026-08-26-stability-tier-relabeling-addendum.md.
+"""
 
 
 def bootstrap_edge_stability(
@@ -58,15 +73,20 @@ def bootstrap_edge_stability(
 
 
 def classify_stability_tier(stability: float) -> str:
-    """Classify a bootstrap stability value into ``"core"``, ``"provisional"``, or
-    ``"background"``, per the charter's approved thresholds.
+    """Classify a bootstrap stability value into ``"frequently_selected"``,
+    ``"intermittently_selected"``, or ``"rarely_selected"``, per the charter's
+    approved thresholds (unchanged) and its tier-relabeling addendum (labels
+    only, not thresholds). These labels describe selection frequency under
+    resampling of one dataset -- see ``STABILITY_DISCLOSURE_CAVEAT`` for why
+    they intentionally avoid implying anything about independent-study
+    replication.
     """
 
     if not 0.0 <= stability <= 1.0:
         raise ValueError(f"stability must be in [0, 1], got {stability!r}")
 
-    if stability >= _CORE_THRESHOLD:
-        return "core"
-    if stability >= _PROVISIONAL_THRESHOLD:
-        return "provisional"
-    return "background"
+    if stability >= _FREQUENT_THRESHOLD:
+        return "frequently_selected"
+    if stability >= _INTERMITTENT_THRESHOLD:
+        return "intermittently_selected"
+    return "rarely_selected"
