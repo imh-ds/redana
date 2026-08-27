@@ -40,6 +40,9 @@ def _edge_recovery(reps: list[dict], key: str) -> dict:
 
 def _summarize(reps: list[dict]) -> dict:
     mean_spurious = sum(r["residual_spurious_count"] for r in reps) / len(reps)
+    mean_total_false_positives = (
+        sum(r["residual_total_false_positive_count"] for r in reps) / len(reps)
+    )
     edge_summaries = {key: _edge_recovery(reps, key) for key in _TARGET_KEYS}
 
     moderate_pass = any(
@@ -56,6 +59,7 @@ def _summarize(reps: list[dict]) -> dict:
         "incumbent_recall": sum(r["incumbent_recall"] for r in reps) / len(reps),
         "incumbent_f1": sum(r["incumbent_f1"] for r in reps) / len(reps),
         "mean_spurious": mean_spurious,
+        "mean_total_false_positives": mean_total_false_positives,
         "edges": edge_summaries,
         "decision": decision,
         "decision_reasoning": {
@@ -100,7 +104,9 @@ def main() -> int:
         print(f"n_rows={n_rows} (n_reps={summary['n_reps']}): {summary['decision']}")
         print(
             f"  incumbent(P={summary['incumbent_precision']:.3f}, "
-            f"R={summary['incumbent_recall']:.3f}) mean_spurious={summary['mean_spurious']:.3f}"
+            f"R={summary['incumbent_recall']:.3f}) "
+            f"mean_spurious(beyond-incumbent)={summary['mean_spurious']:.3f} "
+            f"mean_total_false_positives={summary['mean_total_false_positives']:.3f}"
         )
         for key in _TARGET_KEYS:
             edge = summary["edges"][key]
