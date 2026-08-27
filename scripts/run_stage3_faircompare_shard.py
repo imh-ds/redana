@@ -11,8 +11,10 @@ internally. This directly answers the gap prior rounds left open: no
 study before this one reran the incumbent under the same, current
 conditions as redana's fixed measurement setup.
 
-Corrected 2026-08-27, per independent peer review, before the first
-version's results were treated as final: the original cost metric
+Corrected 2026-08-27. The original version's FAIL-at-all-three-`n_rows`
+result was reported to the project owner as a firm, predeclared stop
+signal; independent peer review caught the scoring error described below
+only afterward, on a later review pass. The original cost metric
 (``len(residual_edges - true_edges)``) did not match the charter's own
 definition ("spurious annotations the residual layer adds *beyond the
 incumbent's own false positives*") -- it counted every residual edge
