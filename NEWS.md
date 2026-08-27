@@ -141,17 +141,22 @@ isolation, at n=1,000:
   concrete pass/fail criteria before seeing any results, and to not
   automatically pursuing further fixes on a failing result without a
   fresh, independently justified reason.
-- Result: did not meet the predeclared bar at any of the three sample
-  sizes tested. Reporting this plainly, as committed to in advance,
-  rather than reframing it after the fact.
-- The result was not a flat "no signal" finding, though — one of the two
-  relationships tested cleared the detection bar cleanly at the largest
-  sample size, but came with more spurious extra findings than the
-  predeclared standard allowed. The other relevant relationship (the one
-  affected by the mimicking-variable problem above) recovered nothing at
-  any sample size, exactly as that finding would predict, since this
-  round deliberately used the current, unmodified default rather than an
-  unvalidated fix.
-- Per the commitment made in advance, this result does not by itself
-  authorize further attempts to fix or work around the outcome — any
-  such next step needs its own independent justification going forward.
+- Initial result did not meet the predeclared bar at any of the three
+  sample sizes tested. Independent peer review then caught a genuine
+  scoring bug in how the "added noise" side of that bar was computed —
+  it wrongly counted a correctly-detected real relationship (the
+  mimicking-variable one, see above) as a false alarm, and double-counted
+  noise the incumbent already had. Corrected and rescored using the
+  identical underlying data (not a new run) — a legitimate correction,
+  not a second attempt at a different answer.
+- **Corrected result: the largest sample size tested now clears the bar
+  in full.** The smaller two do not, for the same underlying reason as
+  originally found — the detection side, not the noise side, which the
+  scoring bug never actually affected there.
+- Per the commitment made in advance, a passing result here doesn't mean
+  the tool is validated or ready — it means one specific, meaningful next
+  question is worth considering, not decided. Two open questions flagged
+  by review remain before trusting this further: whether the
+  significance-testing machinery has been properly checked at this scale
+  under known-null conditions, and whether this holds beyond the one
+  synthetic structure tested so far.
