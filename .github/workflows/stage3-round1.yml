@@ -1,0 +1,58 @@
+name: Stage III Round 1 Hybrid Benchmark
+
+# Manually-triggered only (no push/PR trigger). Shards
+# docs/superpowers/plans/2026-08-27-stage3-hybrid-benchmark-round1.md's
+# Task 3 grid across parallel jobs: one shard per (n_rows, rep-chunk),
+# 10 reps/shard, 5 shards per n_rows -- 15 shards total, given the
+# 66-pairs-per-replication cost of the 12-node hybrid fixture. See
+# scripts/run_stage3_round1_shard.py and scripts/aggregate_stage3_round1.py
+# for what each job computes.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        n_rows: [200, 500, 1000]
+        rep_chunk: [0, 1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - name: Run shard
+        run: |
+          python scripts/run_stage3_round1_shard.py \
+            --n-rows "${{ matrix.n_rows }}" \
+            --rep-chunk "${{ matrix.rep_chunk }}" \
+            --out result.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-n${{ matrix.n_rows }}-chunk${{ matrix.rep_chunk }}
+          path: result.json
+
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - uses: actions/download-artifact@v4
+        with:
+          path: shards
+      - name: Aggregate shards into the results table
+        run: python scripts/aggregate_stage3_round1.py shards | tee summary.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage3-round1-summary
+          path: |
+            summary.txt
+            scripts/stage3_round1_results.json
