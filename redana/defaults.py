@@ -2,13 +2,16 @@
 
 docs/evidence/track2-low-n-power-levers-20260826.md found that
 n_splits=2, alpha=0.15 meaningfully improves detection with no precision
-cost at n_rows in {100, 200} (the tested regime), but a follow-up
-regression check at n_rows=1000, coefficient=0.7 (recorded in
-docs/superpowers/specs/2026-08-26-track2-default-adoption-addendum.md)
-found the same values cost ~14 points of residual precision there for
-zero detection benefit -- detection was already at ceiling with the
-original settings. Neither combination was tested at n_rows strictly
-between 200 and 1000.
+cost at n_rows in {100, 200}, but a regression check at n_rows=1000,
+coefficient=0.7 found the same values cost ~14 points of residual
+precision there for zero detection benefit. The gap between 200 and
+1,000 was subsequently bracketed at 25-row resolution, at coefficient=0.7
+(the known-costly anchor), by
+docs/evidence/track2-threshold-justification-20260826.md: the crossover
+falls between n_rows=225 (still net-favorable) and n_rows=250 (detection
+improvement drops to exactly zero, precision cost remains). A
+coefficient=0.20 sanity check confirmed the tuned values stay safe
+throughout the same bracket for weak effects.
 
 This module packages that as a conditional recommendation rather than a
 global default: below the tested low-n threshold, use the tuned values;
@@ -24,7 +27,7 @@ from dataclasses import dataclass
 
 from redana.residuals import PrototypeConfig
 
-_LOW_N_THRESHOLD = 200
+_LOW_N_THRESHOLD = 225
 _LOW_N_SPLITS = 2
 _LOW_N_ALPHA = 0.15
 _DEFAULT_N_SPLITS = 5
@@ -42,13 +45,13 @@ class RecommendedSettings:
 def recommended_settings(n_rows: int) -> RecommendedSettings:
     """Return the sample-size-appropriate settings for ``n_rows`` rows.
 
-    ``n_rows <= 200`` (the regime directly validated in
-    docs/evidence/track2-low-n-power-levers-20260826.md) returns the
-    tuned low-n values (``n_splits=2, alpha=0.15``). Above that, returns
-    the original settings (``n_splits=5, alpha=0.05``) used throughout
-    every prior study in this project, since the tuned values were found
-    to cost precision with no detection benefit at ``n_rows=1000`` and
-    were never tested in between.
+    ``n_rows <= 225`` (the largest bracketed point still classified
+    "safe" in docs/evidence/track2-threshold-justification-20260826.md)
+    returns the tuned low-n values (``n_splits=2, alpha=0.15``). Above
+    that, returns the original settings (``n_splits=5, alpha=0.05``)
+    used throughout every prior study in this project. Note the ``225``
+    classification is a narrow one -- see that evidence note's discussion
+    of its detection-improvement margin relative to its precision cost.
     """
 
     if n_rows <= _LOW_N_THRESHOLD:
