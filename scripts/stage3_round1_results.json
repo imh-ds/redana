@@ -1,0 +1,73 @@
+{
+  "conditions": [
+    {
+      "n_rows": 200,
+      "summary": {
+        "n_reps": 50,
+        "incumbent_precision": 0.45096683871683857,
+        "incumbent_recall": 0.6000000000000005,
+        "incumbent_f1": 0.5077450183564063,
+        "residual_precision": 0.11353174603174603,
+        "residual_recall": 0.11714285714285713,
+        "residual_f1": 0.11514285714285714,
+        "mean_recovery_rate": 0.006666666666666666,
+        "recovery_rate_n_eligible_reps": 50,
+        "mean_residual_spurious_count": 0.92,
+        "incumbent_auprc": 0.4756932101613578,
+        "residual_auprc": 0.4891362732725546,
+        "incumbent_precision_at_matched_fpr": 0.45388888888888873,
+        "residual_precision_at_matched_fpr": 0.4342821067821066,
+        "redundant_pair_flag_rate_incumbent": 1.0,
+        "redundant_pair_flag_rate_residual": 0.24,
+        "mean_isolated_false_positives_incumbent": 0.9,
+        "mean_isolated_false_positives_residual": 0.28
+      }
+    },
+    {
+      "n_rows": 500,
+      "summary": {
+        "n_reps": 50,
+        "incumbent_precision": 0.4014025190495779,
+        "incumbent_recall": 0.6142857142857148,
+        "incumbent_f1": 0.4805803993048577,
+        "residual_precision": 0.1864285714285714,
+        "residual_recall": 0.19428571428571423,
+        "residual_f1": 0.19009523809523807,
+        "mean_recovery_rate": 0.04666666666666667,
+        "recovery_rate_n_eligible_reps": 50,
+        "mean_residual_spurious_count": 0.7,
+        "incumbent_auprc": 0.4867734229281041,
+        "residual_auprc": 0.6743242790720528,
+        "incumbent_precision_at_matched_fpr": 0.4584848484848484,
+        "residual_precision_at_matched_fpr": 0.5064646464646466,
+        "redundant_pair_flag_rate_incumbent": 1.0,
+        "redundant_pair_flag_rate_residual": 0.28,
+        "mean_isolated_false_positives_incumbent": 1.12,
+        "mean_isolated_false_positives_residual": 0.12
+      }
+    },
+    {
+      "n_rows": 1000,
+      "summary": {
+        "n_reps": 50,
+        "incumbent_precision": 0.3810985680985681,
+        "incumbent_recall": 0.6342857142857148,
+        "incumbent_f1": 0.4729179633575918,
+        "residual_precision": 0.22198412698412692,
+        "residual_recall": 0.23999999999999994,
+        "residual_f1": 0.23009523809523802,
+        "mean_recovery_rate": 0.12999999999999998,
+        "recovery_rate_n_eligible_reps": 50,
+        "mean_residual_spurious_count": 0.76,
+        "incumbent_auprc": 0.48717554174446925,
+        "residual_auprc": 0.7492103339764093,
+        "incumbent_precision_at_matched_fpr": 0.45868686868686837,
+        "residual_precision_at_matched_fpr": 0.5348484848484849,
+        "redundant_pair_flag_rate_incumbent": 1.0,
+        "redundant_pair_flag_rate_residual": 0.32,
+        "mean_isolated_false_positives_incumbent": 1.08,
+        "mean_isolated_false_positives_residual": 0.08
+      }
+    }
+  ]
+}

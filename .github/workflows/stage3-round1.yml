@@ -10,8 +10,6 @@ name: Stage III Round 1 Hybrid Benchmark
 
 on:
   workflow_dispatch: {}
-  push:
-    branches: [codex/batch-null-calibration]
 
 jobs:
   shard:
