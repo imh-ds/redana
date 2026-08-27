@@ -253,6 +253,73 @@ def generate_stage2_shape_fixture(
     return frame, true_edges
 
 
+def generate_stage3_hybrid_fixture(
+    n_rows: int,
+    seed: int,
+    strong_coefficient: float = 0.7,
+    moderate_coefficient: float = 0.4,
+    weak_coefficient: float = 0.25,
+    redundancy: float = 0.85,
+) -> tuple[pd.DataFrame, frozenset[tuple[str, str]], frozenset[tuple[str, str]]]:
+    """Generate the Stage III round 1 hybrid fixture: two hub communities,
+    mixed edge types, heterogeneous strength, a redundant pair, and isolated nodes.
+
+    Per
+    ``docs/superpowers/specs/2026-08-27-stage3-hybrid-benchmark-round1-charter.md``
+    decision 1: 12 nodes, reusing ``generate_stage2_hub_fixture``'s
+    degree-3 hub/spoke shape twice (community A: ``X1`` hub with spokes
+    ``X2``-``X4``; community B: ``X7`` hub with spokes ``X8``-``X10``),
+    joined by one weak nonlinear bridge edge (``X1``-``X12``) crossing
+    between the two communities. Each community's spokes span round 1's
+    strong/moderate strength zones and include one nonlinear spoke
+    (reusing the F3-validated ``coefficient*(Z^2-1)`` shape), so true
+    edges are a linear majority (4 linear, 3 nonlinear) rather than one
+    fixed relationship family. ``X5`` is a redundant/collinear copy of
+    ``X1`` (correlation ``redundancy``, reusing
+    ``generate_stage2_redundant_predictors_fixture``'s pattern) with no
+    true edge of its own -- a direct false-positive-under-collinearity
+    test. ``X6`` and ``X11`` carry no true edges at all, to observe
+    false-positive behavior under realistic sparsity.
+    """
+
+    rng = np.random.default_rng(seed)
+    e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12 = rng.standard_normal((12, n_rows))
+
+    x1 = e1
+    x2 = strong_coefficient * x1 + e2
+    x3 = moderate_coefficient * x1 + e3
+    x4 = moderate_coefficient * (x1**2 - 1) + e4
+    x5 = redundancy * x1 + np.sqrt(1 - redundancy**2) * e5
+    x6 = e6
+
+    x7 = e7
+    x8 = strong_coefficient * x7 + e8
+    x9 = moderate_coefficient * x7 + e9
+    x10 = moderate_coefficient * (x7**2 - 1) + e10
+    x11 = e11
+    x12 = weak_coefficient * (x1**2 - 1) + e12
+
+    frame = pd.DataFrame(
+        {
+            "X1": x1,
+            "X2": x2,
+            "X3": x3,
+            "X4": x4,
+            "X5": x5,
+            "X6": x6,
+            "X7": x7,
+            "X8": x8,
+            "X9": x9,
+            "X10": x10,
+            "X11": x11,
+            "X12": x12,
+        }
+    )
+    true_linear_edges = frozenset({("X1", "X2"), ("X1", "X3"), ("X7", "X8"), ("X7", "X9")})
+    true_nonlinear_edges = frozenset({("X1", "X4"), ("X7", "X10"), ("X1", "X12")})
+    return frame, true_linear_edges, true_nonlinear_edges
+
+
 def generate_stage1_nonlinear_fixture(
     n_rows: int,
     seed: int,
