@@ -81,3 +81,26 @@ isolation, at n=1,000:
 - Tested (and rejected) an adaptive, data-driven configuration selector
   as an alternative to the static threshold — it performed worse than
   chance in evaluation, a clean negative result.
+
+## Stage III — first hybrid benchmark, round 1 (2026-08-27)
+
+- Built the first hybrid fixture combining multiple realistic
+  characteristics at once (mixed edge types, heterogeneous strength,
+  hub/community structure, a redundant pair, isolated nodes), plus a
+  second comparator-fairness scoring protocol (AUPRC and precision at a
+  matched false-positive rate) to complement the existing native-workflow
+  comparison.
+- Found the residual layer's practical value on this harder, more
+  realistic structure is real but modest at its default threshold —
+  recovering only 0.7–13% of the edges the incumbent method missed
+  across n=200–1,000 — while its underlying pairwise ranking is
+  substantially stronger than that number alone suggests, a genuine
+  divergence between the two fairness protocols worth following up.
+- Found the incumbent method flags a deliberately collinear, non-causal
+  pair as an edge 100% of the time, regardless of sample size — a stark
+  version of a false-positive pattern seen earlier in Stage II.
+- Caught and disclosed a reliability problem in the incumbent's
+  continuous scoring: its underlying solver doesn't converge on this
+  fixture, making its fine-grained ranking-based scores noisy and not
+  exactly reproducible run to run, while its final edge decisions stay
+  stable. Reported transparently rather than papered over.
