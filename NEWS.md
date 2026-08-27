@@ -131,3 +131,27 @@ isolation, at n=1,000:
   — and corrected an earlier write-up that had mislabeled that mimicking
   variable's own strong relationship as a false positive when it was
   actually a real, correctly-detected one.
+
+## Stage III — fair matched comparison (2026-08-27)
+
+- Before drawing further conclusions, ran the current, actually-usable
+  version of the tool head-to-head against the incumbent, on identical
+  datasets, at three realistic sample sizes — the direct comparison no
+  earlier round had actually done. Committed in advance to specific,
+  concrete pass/fail criteria before seeing any results, and to not
+  automatically pursuing further fixes on a failing result without a
+  fresh, independently justified reason.
+- Result: did not meet the predeclared bar at any of the three sample
+  sizes tested. Reporting this plainly, as committed to in advance,
+  rather than reframing it after the fact.
+- The result was not a flat "no signal" finding, though — one of the two
+  relationships tested cleared the detection bar cleanly at the largest
+  sample size, but came with more spurious extra findings than the
+  predeclared standard allowed. The other relevant relationship (the one
+  affected by the mimicking-variable problem above) recovered nothing at
+  any sample size, exactly as that finding would predict, since this
+  round deliberately used the current, unmodified default rather than an
+  unvalidated fix.
+- Per the commitment made in advance, this result does not by itself
+  authorize further attempts to fix or work around the outcome — any
+  such next step needs its own independent justification going forward.
