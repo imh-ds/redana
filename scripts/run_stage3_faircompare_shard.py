@@ -26,6 +26,24 @@ Both are fixed here: (X1, X5) is now treated as real for scoring
 purposes (affecting incumbent precision/recall too, for consistency),
 and the cost metric now only counts residual false positives the
 incumbent did not already flag.
+
+Refactored 2026-08-27, per independent peer review's further
+refinements: the local ``(X1, X5)`` patch is replaced with
+``redana.scenarios.stage3_hybrid_scoring_true_edges`` (a single, shared,
+documented definition, so future scripts can't reintroduce the same
+scoring bug by hand-rolling their own patch), and a second cost metric
+is now reported alongside the existing one. ``residual_spurious_count``
+(unchanged, the metric the fair-comparison decision rule actually uses)
+answers "how many false edges does the *combined* incumbent+redana
+network gain from adding redana" -- the metric appropriate for a
+combined-workflow claim. The new ``residual_total_false_positive_count``
+answers a different, also-real question: "how many false annotations
+does the residual layer produce in total," including ones already
+present in the incumbent's own output -- closer to what a researcher
+might care about if a residual annotation changes how they read an
+existing incumbent edge, even when it doesn't add a *new* edge to the
+combined network. Reporting both, clearly labeled, avoids the ambiguity
+of collapsing them into one "spurious annotations" number.
 """
 
 from __future__ import annotations
@@ -37,7 +55,7 @@ from redana.dependence import derive_seed
 from redana.network import NetworkConfig
 from redana.prototype import run_prototype
 from redana.residuals import PrototypeConfig
-from redana.scenarios import generate_stage3_hybrid_fixture
+from redana.scenarios import generate_stage3_hybrid_fixture, stage3_hybrid_scoring_true_edges
 from redana.scoring import score_edges
 
 _REPS_PER_SHARD = 5
@@ -49,7 +67,6 @@ _TARGET_EDGES = {
     "X10-X7": ("X10", "X7"),
     "X1-X12": ("X1", "X12"),
 }
-_KNOWN_REAL_EXTRA_EDGES = {("X1", "X5")}
 
 
 def _canonical(edges) -> set[tuple[str, str]]:
@@ -60,8 +77,7 @@ def run_replication(n_rows: int, rep_index: int) -> dict:
     condition_name = f"stage3-faircompare-n{n_rows}"
     seed = derive_seed("stage3-faircompare", condition_name, rep_index, _BASE_SEED)
     frame, true_linear, true_nonlinear = generate_stage3_hybrid_fixture(n_rows, seed)
-    true_edges = _canonical(true_linear | true_nonlinear)
-    scoring_true_edges = true_edges | _canonical(_KNOWN_REAL_EXTRA_EDGES)
+    scoring_true_edges = _canonical(stage3_hybrid_scoring_true_edges(true_linear, true_nonlinear))
 
     result = run_prototype(frame, PrototypeConfig(), NetworkConfig(), _PERMUTATIONS, _ALPHA, seed)
     incumbent_edges = _canonical(result.incumbent.edges)
@@ -71,6 +87,7 @@ def run_replication(n_rows: int, rep_index: int) -> dict:
     incumbent_false_positives = incumbent_edges - scoring_true_edges
     residual_false_positives = residual_edges - scoring_true_edges
     residual_spurious_count = len(residual_false_positives - incumbent_false_positives)
+    residual_total_false_positive_count = len(residual_false_positives)
 
     target_results = {}
     for key, edge in _TARGET_EDGES.items():
@@ -89,6 +106,7 @@ def run_replication(n_rows: int, rep_index: int) -> dict:
         "incumbent_recall": incumbent_score.recall,
         "incumbent_f1": incumbent_score.f1,
         "residual_spurious_count": residual_spurious_count,
+        "residual_total_false_positive_count": residual_total_false_positive_count,
         "target_edges": target_results,
     }
 
