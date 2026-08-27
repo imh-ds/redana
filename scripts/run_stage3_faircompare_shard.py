@@ -10,6 +10,20 @@ redana.prototype.run_prototype, which fits both on the same frame
 internally. This directly answers the gap prior rounds left open: no
 study before this one reran the incumbent under the same, current
 conditions as redana's fixed measurement setup.
+
+Corrected 2026-08-27, per independent peer review, before the first
+version's results were treated as final: the original cost metric
+(``len(residual_edges - true_edges)``) did not match the charter's own
+definition ("spurious annotations the residual layer adds *beyond the
+incumbent's own false positives*") -- it counted every residual edge
+outside the declared true-edge set, including ones the incumbent already
+flags, and it treated (X1, X5) as a false edge despite the
+permutation-resolution diagnostic's correction that X1-X5 is a real,
+constructed relationship (X5 = 0.85*X1 + noise), not a false positive.
+Both are fixed here: (X1, X5) is now treated as real for scoring
+purposes (affecting incumbent precision/recall too, for consistency),
+and the cost metric now only counts residual false positives the
+incumbent did not already flag.
 """
 
 from __future__ import annotations
@@ -33,6 +47,7 @@ _TARGET_EDGES = {
     "X10-X7": ("X10", "X7"),
     "X1-X12": ("X1", "X12"),
 }
+_KNOWN_REAL_EXTRA_EDGES = {("X1", "X5")}
 
 
 def _canonical(edges) -> set[tuple[str, str]]:
@@ -44,13 +59,16 @@ def run_replication(n_rows: int, rep_index: int) -> dict:
     seed = derive_seed("stage3-faircompare", condition_name, rep_index, _BASE_SEED)
     frame, true_linear, true_nonlinear = generate_stage3_hybrid_fixture(n_rows, seed)
     true_edges = _canonical(true_linear | true_nonlinear)
+    scoring_true_edges = true_edges | _canonical(_KNOWN_REAL_EXTRA_EDGES)
 
     result = run_prototype(frame, PrototypeConfig(), NetworkConfig(), _PERMUTATIONS, _ALPHA, seed)
     incumbent_edges = _canonical(result.incumbent.edges)
     residual_edges = _canonical(result.residual_edges)
 
-    incumbent_score = score_edges(true_edges, incumbent_edges)
-    residual_spurious_count = len(residual_edges - true_edges)
+    incumbent_score = score_edges(scoring_true_edges, incumbent_edges)
+    incumbent_false_positives = incumbent_edges - scoring_true_edges
+    residual_false_positives = residual_edges - scoring_true_edges
+    residual_spurious_count = len(residual_false_positives - incumbent_false_positives)
 
     target_results = {}
     for key, edge in _TARGET_EDGES.items():
