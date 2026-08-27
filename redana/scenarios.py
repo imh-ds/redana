@@ -320,6 +320,44 @@ def generate_stage3_hybrid_fixture(
     return frame, true_linear_edges, true_nonlinear_edges
 
 
+def stage3_hybrid_known_real_extra_edges() -> frozenset[tuple[str, str]]:
+    """Return the Stage III hybrid fixture's known-real edges outside the designed true-edge set.
+
+    ``X5 = redundancy*X1 + noise`` (see ``generate_stage3_hybrid_fixture``)
+    is mechanistically the same kind of constructed relationship as
+    ``X2 = strong_coefficient*X1 + noise`` -- a true edge in that
+    fixture -- just a different coefficient. There is no principled
+    statistical basis for treating one as real and the other as a false
+    positive when both were built identically; ``(X1, X5)`` was
+    deliberately excluded from the *designed* true-edge set (it exists to
+    test false-positive robustness under collinearity, not as a direct
+    structural edge), but it is real for scoring purposes -- flagging it
+    is correct detection, not a false positive. See
+    ``docs/evidence/stage3-permutation-resolution-diagnostic-20260827.md``
+    for the original correction this formalizes.
+    """
+
+    return frozenset({("X1", "X5")})
+
+
+def stage3_hybrid_scoring_true_edges(
+    true_linear_edges: frozenset[tuple[str, str]],
+    true_nonlinear_edges: frozenset[tuple[str, str]],
+) -> frozenset[tuple[str, str]]:
+    """Return the Stage III hybrid fixture's true-edge set used for scoring false positives.
+
+    Distinct from the *designed* true-edge set
+    (``generate_stage3_hybrid_fixture``'s own return values, used for the
+    recovery metric, which is specifically about the deliberately-
+    constructed structural edges): this adds
+    ``stage3_hybrid_known_real_extra_edges``, so that a real relationship
+    excluded from the design for other reasons is never counted as a
+    false positive.
+    """
+
+    return true_linear_edges | true_nonlinear_edges | stage3_hybrid_known_real_extra_edges()
+
+
 def generate_stage1_nonlinear_fixture(
     n_rows: int,
     seed: int,

@@ -5,7 +5,11 @@ from __future__ import annotations
 
 import pandas as pd
 
-from redana.scenarios import generate_stage3_hybrid_fixture
+from redana.scenarios import (
+    generate_stage3_hybrid_fixture,
+    stage3_hybrid_known_real_extra_edges,
+    stage3_hybrid_scoring_true_edges,
+)
 
 
 def test_hybrid_fixture_has_correct_shape() -> None:
@@ -66,6 +70,29 @@ def test_hybrid_fixture_redundant_pair_is_highly_correlated_but_not_a_true_edge(
     assert ("X5", "X1") not in all_edges
     correlation = abs(frame["X1"].corr(frame["X5"]))
     assert correlation > 0.7
+
+
+def test_known_real_extra_edges_contains_only_x1_x5() -> None:
+    # X5 = 0.85*X1 + noise is mechanistically the same kind of constructed
+    # relationship as X2 = 0.7*X1 + noise (a true edge) -- real for scoring
+    # purposes, even though it is deliberately not part of the fixture's
+    # own designed true-edge set (see the redundant-pair test above).
+    assert stage3_hybrid_known_real_extra_edges() == frozenset({("X1", "X5")})
+
+
+def test_scoring_true_edges_includes_x1_x5_but_designed_edges_are_unchanged() -> None:
+    _, linear_edges, nonlinear_edges = generate_stage3_hybrid_fixture(1000, seed=1)
+    designed_edges = linear_edges | nonlinear_edges
+
+    scoring_edges = stage3_hybrid_scoring_true_edges(linear_edges, nonlinear_edges)
+
+    # The fixture's own designed true-edge sets are untouched by this helper.
+    assert linear_edges | nonlinear_edges == designed_edges
+    assert ("X1", "X5") not in designed_edges
+
+    # The scoring set adds exactly the one known-real extra edge.
+    assert ("X1", "X5") in scoring_edges
+    assert scoring_edges == designed_edges | {("X1", "X5")}
 
 
 def test_hybrid_fixture_reuses_hub_topology_for_each_community() -> None:
