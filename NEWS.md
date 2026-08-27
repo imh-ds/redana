@@ -96,11 +96,38 @@ isolation, at n=1,000:
   across n=200–1,000 — while its underlying pairwise ranking is
   substantially stronger than that number alone suggests, a genuine
   divergence between the two fairness protocols worth following up.
-- Found the incumbent method flags a deliberately collinear, non-causal
-  pair as an edge 100% of the time, regardless of sample size — a stark
-  version of a false-positive pattern seen earlier in Stage II.
 - Caught and disclosed a reliability problem in the incumbent's
   continuous scoring: its underlying solver doesn't converge on this
   fixture, making its fine-grained ranking-based scores noisy and not
   exactly reproducible run to run, while its final edge decisions stay
   stable. Reported transparently rather than papered over.
+- *(Correction, 2026-08-27: an earlier version of this entry described
+  the incumbent flagging a deliberately-collinear pair as a "false
+  positive." That framing was wrong — the pair was constructed as a real
+  linear relationship, just one we'd chosen not to label a "true edge."
+  See the permutation-diagnostic entry below.)*
+
+## Stage III — permutation-resolution diagnostic (2026-08-27)
+
+- Independent peer review of round 1's results identified two
+  measurement problems worth resolving before trusting its sample-size
+  findings: too few permutations to resolve statistical significance
+  once many relationships are tested at once, and an evaluation design
+  that mixed together two different effects when it removed a
+  problematic variable. Built a diagnostic to test both cleanly.
+- Confirmed both were real and quantified each one separately: raising
+  permutation resolution alone roughly doubled the nonlinear layer's
+  detection power; separately fixing the collinear-variable problem (see
+  below) roughly doubled it again at the larger sample size tested.
+  Detection at n=500 rose from 8% to 33% from these two measurement and
+  design fixes alone, with no change to the underlying method.
+- Found a third, larger, previously-unquantified cost: simply testing
+  many relationships at once costs about half the achievable detection
+  power, even after both fixes above — the single biggest lever left on
+  the table, and not yet addressed.
+- Confirmed, with a cleaner test design than before, that a variable
+  built to closely mimic another variable can suppress the nonlinear
+  layer's ability to detect a real relationship attached to the original
+  — and corrected an earlier write-up that had mislabeled that mimicking
+  variable's own strong relationship as a false positive when it was
+  actually a real, correctly-detected one.
