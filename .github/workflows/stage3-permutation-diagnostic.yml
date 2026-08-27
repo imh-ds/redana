@@ -1,0 +1,62 @@
+name: Stage III Permutation-Resolution Diagnostic
+
+# Manually-triggered only (no push/PR trigger). Shards
+# docs/superpowers/plans/2026-08-27-stage3-permutation-resolution-diagnostic.md's
+# Task 2 grid across parallel jobs: one shard per (config, n_rows,
+# rep-chunk), 5 reps/shard, 10 chunks per (config, n_rows) cell -- 90
+# shards total, given the added cost of 1999 permutations (vs. 199
+# elsewhere in the project) per pair. See
+# scripts/run_stage3_permdiag_shard.py and
+# scripts/aggregate_stage3_permdiag.py for what each job computes.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [A, B_baseline, B_targeted]
+        n_rows: [200, 350, 500]
+        rep_chunk: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - name: Run shard
+        run: |
+          python scripts/run_stage3_permdiag_shard.py \
+            --config "${{ matrix.config }}" \
+            --n-rows "${{ matrix.n_rows }}" \
+            --rep-chunk "${{ matrix.rep_chunk }}" \
+            --out result.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.config }}-n${{ matrix.n_rows }}-chunk${{ matrix.rep_chunk }}
+          path: result.json
+
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - uses: actions/download-artifact@v4
+        with:
+          path: shards
+      - name: Aggregate shards into the results table
+        run: python scripts/aggregate_stage3_permdiag.py shards | tee summary.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage3-permdiag-summary
+          path: |
+            summary.txt
+            scripts/stage3_permdiag_results.json
