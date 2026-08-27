@@ -1,0 +1,106 @@
+{
+  "cells": [
+    {
+      "n_rows": 200,
+      "summary": {
+        "n_reps": 50,
+        "incumbent_precision": 0.4458324453324455,
+        "incumbent_recall": 0.6171428571428578,
+        "incumbent_f1": 0.5113433343402385,
+        "mean_spurious": 2.34,
+        "edges": {
+          "X1-X4": {
+            "n_eligible": 46,
+            "n_recovered": 2,
+            "recovery_rate": 0.043478260869565216
+          },
+          "X10-X7": {
+            "n_eligible": 41,
+            "n_recovered": 0,
+            "recovery_rate": 0.0
+          },
+          "X1-X12": {
+            "n_eligible": 47,
+            "n_recovered": 0,
+            "recovery_rate": 0.0
+          }
+        },
+        "decision": "FAIL",
+        "decision_reasoning": {
+          "moderate_edge_recovery_pass": false,
+          "spurious_cost_pass": false,
+          "recovery_threshold": 0.25,
+          "spurious_threshold": 1.5
+        }
+      }
+    },
+    {
+      "n_rows": 350,
+      "summary": {
+        "n_reps": 50,
+        "incumbent_precision": 0.41175652125652124,
+        "incumbent_recall": 0.6228571428571434,
+        "incumbent_f1": 0.48800280894230286,
+        "mean_spurious": 1.84,
+        "edges": {
+          "X1-X4": {
+            "n_eligible": 46,
+            "n_recovered": 0,
+            "recovery_rate": 0.0
+          },
+          "X10-X7": {
+            "n_eligible": 39,
+            "n_recovered": 5,
+            "recovery_rate": 0.1282051282051282
+          },
+          "X1-X12": {
+            "n_eligible": 47,
+            "n_recovered": 0,
+            "recovery_rate": 0.0
+          }
+        },
+        "decision": "FAIL",
+        "decision_reasoning": {
+          "moderate_edge_recovery_pass": false,
+          "spurious_cost_pass": false,
+          "recovery_threshold": 0.25,
+          "spurious_threshold": 1.5
+        }
+      }
+    },
+    {
+      "n_rows": 500,
+      "summary": {
+        "n_reps": 50,
+        "incumbent_precision": 0.4069845300897931,
+        "incumbent_recall": 0.631428571428572,
+        "incumbent_f1": 0.48984186094786447,
+        "mean_spurious": 1.82,
+        "edges": {
+          "X1-X4": {
+            "n_eligible": 42,
+            "n_recovered": 0,
+            "recovery_rate": 0.0
+          },
+          "X10-X7": {
+            "n_eligible": 42,
+            "n_recovered": 21,
+            "recovery_rate": 0.5
+          },
+          "X1-X12": {
+            "n_eligible": 45,
+            "n_recovered": 1,
+            "recovery_rate": 0.022222222222222223
+          }
+        },
+        "decision": "FAIL",
+        "decision_reasoning": {
+          "moderate_edge_recovery_pass": true,
+          "spurious_cost_pass": false,
+          "recovery_threshold": 0.25,
+          "spurious_threshold": 1.5
+        }
+      }
+    }
+  ]
+}
