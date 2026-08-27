@@ -11,6 +11,8 @@ name: Stage III Permutation-Resolution Diagnostic
 
 on:
   workflow_dispatch: {}
+  push:
+    branches: [codex/batch-null-calibration]
 
 jobs:
   shard:
