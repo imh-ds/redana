@@ -4,10 +4,10 @@
       "n_rows": 200,
       "summary": {
         "n_reps": 50,
-        "incumbent_precision": 0.4458324453324455,
-        "incumbent_recall": 0.6171428571428578,
-        "incumbent_f1": 0.5113433343402385,
-        "mean_spurious": 2.34,
+        "incumbent_precision": 0.55011211011211,
+        "incumbent_recall": 0.665,
+        "incumbent_f1": 0.5946689254718602,
+        "mean_spurious": 1.06,
         "edges": {
           "X1-X4": {
             "n_eligible": 46,
@@ -28,7 +28,7 @@
         "decision": "FAIL",
         "decision_reasoning": {
           "moderate_edge_recovery_pass": false,
-          "spurious_cost_pass": false,
+          "spurious_cost_pass": true,
           "recovery_threshold": 0.25,
           "spurious_threshold": 1.5
         }
@@ -38,10 +38,10 @@
       "n_rows": 350,
       "summary": {
         "n_reps": 50,
-        "incumbent_precision": 0.41175652125652124,
-        "incumbent_recall": 0.6228571428571434,
-        "incumbent_f1": 0.48800280894230286,
-        "mean_spurious": 1.84,
+        "incumbent_precision": 0.5074579864579865,
+        "incumbent_recall": 0.67,
+        "incumbent_f1": 0.568311664614532,
+        "mean_spurious": 0.54,
         "edges": {
           "X1-X4": {
             "n_eligible": 46,
@@ -62,7 +62,7 @@
         "decision": "FAIL",
         "decision_reasoning": {
           "moderate_edge_recovery_pass": false,
-          "spurious_cost_pass": false,
+          "spurious_cost_pass": true,
           "recovery_threshold": 0.25,
           "spurious_threshold": 1.5
         }
@@ -72,10 +72,10 @@
       "n_rows": 500,
       "summary": {
         "n_reps": 50,
-        "incumbent_precision": 0.4069845300897931,
-        "incumbent_recall": 0.631428571428572,
-        "incumbent_f1": 0.48984186094786447,
-        "mean_spurious": 1.82,
+        "incumbent_precision": 0.4992028570844361,
+        "incumbent_recall": 0.6775,
+        "incumbent_f1": 0.568765461633883,
+        "mean_spurious": 0.58,
         "edges": {
           "X1-X4": {
             "n_eligible": 42,
@@ -93,10 +93,10 @@
             "recovery_rate": 0.022222222222222223
           }
         },
-        "decision": "FAIL",
+        "decision": "PASS",
         "decision_reasoning": {
           "moderate_edge_recovery_pass": true,
-          "spurious_cost_pass": false,
+          "spurious_cost_pass": true,
           "recovery_threshold": 0.25,
           "spurious_threshold": 1.5
         }
