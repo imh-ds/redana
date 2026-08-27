@@ -10,6 +10,8 @@ name: Stage III Fair Matched Comparison
 
 on:
   workflow_dispatch: {}
+  push:
+    branches: [codex/batch-null-calibration]
 
 jobs:
   shard:
