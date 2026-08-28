@@ -1,0 +1,85 @@
+name: Stage III FDR Calibration
+
+# Manually-triggered only (no push/PR trigger). Shards
+# docs/superpowers/plans/2026-08-27-stage3-fdr-calibration.md's Task 4
+# grid across parallel jobs: null condition, 3 n_rows x 10 chunks = 30
+# shards; mixed condition, 1 n_rows x 10 chunks = 10 shards; 40 total.
+# See scripts/run_stage3_fdrcal_shard.py and
+# scripts/aggregate_stage3_fdrcal.py for what each job computes and how
+# the predeclared calibration decision rule gets evaluated.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  shard-null:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        n_rows: [200, 350, 500]
+        rep_chunk: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - name: Run shard
+        run: |
+          python scripts/run_stage3_fdrcal_shard.py \
+            --condition null \
+            --n-rows "${{ matrix.n_rows }}" \
+            --rep-chunk "${{ matrix.rep_chunk }}" \
+            --out result.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-null-n${{ matrix.n_rows }}-chunk${{ matrix.rep_chunk }}
+          path: result.json
+
+  shard-mixed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        rep_chunk: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - name: Run shard
+        run: |
+          python scripts/run_stage3_fdrcal_shard.py \
+            --condition mixed \
+            --n-rows 500 \
+            --rep-chunk "${{ matrix.rep_chunk }}" \
+            --out result.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-mixed-n500-chunk${{ matrix.rep_chunk }}
+          path: result.json
+
+  aggregate:
+    needs: [shard-null, shard-mixed]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e ".[dev]"
+      - uses: actions/download-artifact@v4
+        with:
+          path: shards
+      - name: Aggregate shards and evaluate the calibration decision rule
+        run: python scripts/aggregate_stage3_fdrcal.py shards | tee summary.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage3-fdrcal-summary
+          path: |
+            summary.txt
+            scripts/stage3_fdrcal_results.json
