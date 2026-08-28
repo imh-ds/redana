@@ -10,6 +10,8 @@ name: Stage III FDR Calibration
 
 on:
   workflow_dispatch: {}
+  push:
+    branches: [codex/batch-null-calibration]
 
 jobs:
   shard-null:
