@@ -8,6 +8,7 @@
         "incumbent_recall": 0.665,
         "incumbent_f1": 0.5946689254718602,
         "mean_spurious": 1.06,
+        "mean_total_false_positives": 1.34,
         "edges": {
           "X1-X4": {
             "n_eligible": 46,
@@ -42,6 +43,7 @@
         "incumbent_recall": 0.67,
         "incumbent_f1": 0.568311664614532,
         "mean_spurious": 0.54,
+        "mean_total_false_positives": 0.84,
         "edges": {
           "X1-X4": {
             "n_eligible": 46,
@@ -76,6 +78,7 @@
         "incumbent_recall": 0.6775,
         "incumbent_f1": 0.568765461633883,
         "mean_spurious": 0.58,
+        "mean_total_false_positives": 0.82,
         "edges": {
           "X1-X4": {
             "n_eligible": 42,
