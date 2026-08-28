@@ -1,0 +1,16 @@
+{
+  "global_null": {
+    "n_reps": 150,
+    "pooled_any_rejection_rate": 0.22666666666666666,
+    "threshold": 0.12,
+    "decision": "FAIL"
+  },
+  "mixed_signal": {
+    "n_reps": 50,
+    "n_rows": 500,
+    "mean_false_discovery_proportion": 0.09480952380952379,
+    "threshold": 0.1,
+    "decision": "PASS"
+  },
+  "consequence": "n=500 PASS is INVALIDATED as usable evidence pending its own fix (at least one calibration condition failed) -- per charter Decision 4, this does not retroactively change the fair-comparison result itself."
+}
